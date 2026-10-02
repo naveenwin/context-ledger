@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Context Ledger — Cursor chat analytics</title>
+  <style>
+    :root {
+      --bg-app: #0d0d0d;
+      --bg-sidebar: #141414;
+      --bg-main: #1a1a1a;
+      --bg-card: #222222;
+      --bg-hover: #2a2a2a;
+      --bg-selected: #2d2d30;
+      --border: #333333;
+      --text: #cccccc;
+      --text-muted: #858585;
+      --text-dim: #6e6e6e;
+      --accent: #3794ff;
+      --accent-dim: rgba(55, 148, 255, 0.15);
+      --success: #4ec9b0;
+      --warning: #dcdcaa;
+      --danger: #f48771;
+      --status-active: #4ec9b0;
+      --status-completed: #858585;
+      --status-abandoned: #f48771;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+      --sidebar-w: 280px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text);
+      background: var(--bg-app);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .app-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 14px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .app-logo {
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
+      color: var(--accent);
+    }
+
+    .app-brand-text {
+      min-width: 0;
+    }
+
+    .app-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e8e8e8;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .app-tagline {
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-top: 2px;
+    }
+
+    .sidebar-header {
+      padding: 10px 14px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    .repo-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+    }
+
+    .repo-block { margin-bottom: 2px; }
+
+    .repo-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px 6px 8px;
+      cursor: pointer;
+      user-select: none;
+      border-radius: 4px;
+      margin: 0 6px;
+    }
+
+    .repo-row:hover { background: var(--bg-hover); }
+    .repo-row.selected { background: var(--bg-selected); }
+
+    .chevron {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      color: var(--text-dim);
+      transition: transform 0.15s ease;
+    }
+
+    .repo-block.expanded .chevron { transform: rotate(90deg); }
+
+    .repo-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+
+    .chat-list {
+      display: none;
+      padding: 2px 0 4px 0;
+    }
+
+    .repo-block.expanded .chat-list { display: block; }
+
+    .chat-row {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 5px 10px 5px 32px;
+      cursor: pointer;
+      margin: 0 6px;
+      border-radius: 4px;
+    }
+
+    .chat-row:hover { background: var(--bg-hover); }
+    .chat-row.selected { background: var(--accent-dim); outline: 1px solid rgba(55, 148, 255, 0.35); }
+
+    .chat-row-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .status-dot.active { background: var(--status-active); }
+    .status-dot.completed { background: var(--status-completed); }
+    .status-dot.abandoned { background: var(--status-abandoned); }
+
+    .chat-title {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+    }
+
+    .chat-time {
+      font-size: 11px;
+      color: var(--text-dim);
+      padding-left: 12px;
+    }
+
+    .more-btn {
+      display: block;
+      width: calc(100% - 12px);
+      margin: 4px 6px 2px;
+      padding: 5px 10px 5px 32px;
+      text-align: left;
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-family: inherit;
+    }
+
+    .more-btn:hover { background: var(--bg-hover); }
+    .more-btn.active-toggle { background: rgba(55, 148, 255, 0.25); border-color: var(--accent); color: var(--accent); }
+
+    .main {
+      flex: 1;
+      overflow-y: auto;
+      background: var(--bg-main);
+      padding: 20px 24px 32px;
+    }
+
+    .main-header {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .main-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #e8e8e8;
+      margin-bottom: 8px;
+    }
+
+    .main-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: capitalize;
+    }
+
+    .badge.active { background: rgba(78, 201, 176, 0.2); color: var(--status-active); }
+    .badge.completed { background: rgba(133, 133, 133, 0.25); color: #b0b0b0; }
+    .badge.abandoned { background: rgba(244, 135, 113, 0.2); color: var(--status-abandoned); }
+
+    .highlights {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .highlight-chip {
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      max-width: 100%;
+    }
+
+    .highlight-chip:hover { border-color: var(--accent); }
+    .highlight-chip strong { color: #e8e8e8; font-weight: 500; }
+    .highlight-chip span { color: var(--text-muted); }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 6px;
+    }
+
+    .card-value {
+      font-size: 22px;
+      font-weight: 600;
+      color: #e8e8e8;
+      line-height: 1.2;
+    }
+
+    .card-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .section {
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+    }
+
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .context-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 24px;
+      margin-bottom: 14px;
+      font-size: 12px;
+    }
+
+    .context-stats strong { color: #e8e8e8; }
+
+    .chart-wrap {
+      position: relative;
+      height: 120px;
+      margin-top: 8px;
+    }
+
+    .chart-wrap svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .chart-area { fill: var(--accent-dim); }
+    .compress-marker { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+    .bar-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 120px 36px;
+      gap: 10px;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .bar-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-muted);
+    }
+
+    .bar-track {
+      height: 8px;
+      background: var(--bg-main);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 4px;
+      min-width: 2px;
+    }
+
+    .bar-pct {
+      text-align: right;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    table.data-table th {
+      text-align: left;
+      font-weight: 500;
+      color: var(--text-muted);
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    table.data-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(51, 51, 51, 0.6);
+      vertical-align: top;
+    }
+
+    table.data-table tr:last-child td { border-bottom: none; }
+
+    .num { font-variant-numeric: tabular-nums; }
+    .ok { color: var(--success); }
+    .fail { color: var(--danger); }
+
+    .file-path {
+      font-family: var(--mono);
+      font-size: 11px;
+      word-break: break-all;
+    }
+
+    .action-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      margin-right: 8px;
+      font-weight: 600;
+    }
+
+    .action-tag.created { background: rgba(78, 201, 176, 0.2); color: var(--success); }
+    .action-tag.edited { background: rgba(55, 148, 255, 0.2); color: var(--accent); }
+    .action-tag.deleted { background: rgba(244, 135, 113, 0.2); color: var(--danger); }
+
+    .empty-state {
+      color: var(--text-muted);
+      padding: 40px;
+      text-align: center;
+    }
+
+    .models-list { font-size: 12px; color: var(--text); }
+
+    .data-banner {
+      margin-bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(55, 148, 255, 0.35);
+      background: rgba(55, 148, 255, 0.08);
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .data-banner strong { color: #e8e8e8; }
+
+    .tool-mix-bar {
+      display: flex;
+      width: 100%;
+      height: 28px;
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg-main);
+      border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+
+    .tool-mix-segment {
+      height: 100%;
+      min-width: 2px;
+      transition: opacity 0.15s ease;
+    }
+
+    .tool-mix-segment:hover { opacity: 0.85; }
+
+    .tool-mix-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+    }
+
+    .tool-mix-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .tool-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    .tool-mix-item strong {
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .context-budget-table .row-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .budget-swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    table.data-table tr.total-row td {
+      font-weight: 600;
+      color: #e8e8e8;
+      border-top: 1px solid var(--border);
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="app-brand">
+        <svg class="app-logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <rect x="4" y="6" width="24" height="20" rx="4" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M9 12h10M9 16h14M9 20h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="24" cy="10" r="5" fill="var(--bg-sidebar)" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M22.5 10l1 1 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="app-brand-text">
+          <div class="app-name" id="app-name">Context Ledger</div>
+          <div class="app-tagline" id="app-tagline">Local Cursor chat analytics</div>
+        </div>
+      </div>
+      <div class="sidebar-header">Repositories</div>
+      <div class="repo-list" id="repo-list"></div>
+    </aside>
+    <main class="main" id="main"></main>
+  </div>
+
+  <script>
+    const TOOL_PALETTE = [
+      "#3794ff",
+      "#4ec9b0",
+      "#dcdcaa",
+      "#c586c0",
+      "#f48771",
+      "#ce9178",
+      "#9cdcfe",
+      "#b5cea8",
+      "#569cd6",
+      "#d16969",
+    ];
+
+    const CONTEXT_BUDGET_ROWS = [
+      { key: "systemPrompts", label: "System prompts", color: "#3794ff" },
+      { key: "toolDefinitions", label: "Tool definitions", color: "#4ec9b0" },
+      { key: "rules", label: "Rules", color: "#dcdcaa" },
+      { key: "skills", label: "Skills", color: "#c586c0" },
+      { key: "mcpDynamicTools", label: "MCP & dynamic tools", color: "#f48771" },
+      { key: "subagent", label: "Sub-agent", color: "#ce9178" },
+      { key: "summarizedConversation", label: "Summarized conversation", color: "#9cdcfe" },
+      { key: "conversation", label: "Conversation", color: "#b5cea8" },
+    ];
+
+    /** Rename here after you pick a product name */
+    const APP_BRAND = {
+      name: "Context Ledger",
+      tagline: "Cursor chat analytics, locally",
+    };
+
+    let MOCK_DATA = { repositories: [] };
+    let DATA_META = {};
+
+    const state = {
+      expandedRepoIds: new Set(),
+      visibleChatCount: {},
+      selectedRepoId: null,
+      selectedChatId: null,
+      contextHistoryPoints: [],
+      contextHistoryStats: null,
+      historyYMode: "percent",
+      watchStatus: null,
+    };
+
+    let historyPollTimer = null;
+    let historyPollingChatId = null;
+
+    function formatDuration(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h > 0) return `${h}h ${m}m`;
+      if (m > 0) return `${m}m ${s}s`;
+      return `${s}s`;
+    }
+
+    function formatChars(n) {
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)} MB`;
+      if (n >= 1000) return `${(n / 1000).toFixed(1)} KB`;
+      return `${n} chars`;
+    }
+
+    function formatRelative(iso) {
+      const d = new Date(iso);
+      const now = new Date();
+      const diffMs = now - d;
+      const mins = Math.floor(diffMs / 60000);
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 48) return `${hrs}h ago`;
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    }
+
+    function formatDateTime(iso) {
+      return new Date(iso).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    function getRepo(id) {
+      return MOCK_DATA.repositories.find((r) => r.id === id);
+    }
+
+    function getChat(repo, chatId) {
+      return repo.chats.find((c) => c.id === chatId);
+    }
+
+    function contextMetrics(series) {
+      if (!series.length) return { peak: 0, latest: 0, compressCount: 0 };
+      const peak = Math.max(...series.map((p) => p.percent));
+      const latest = series[series.length - 1].percent;
+      const compressCount = series.filter((p) => p.compress).length;
+      return { peak, latest, compressCount };
+    }
+
+    function usesCursorContext(chat) {
+      return (
+        chat?.meta?.contextSource === "cursor-composer" ||
+        (chat?.meta?.composerLinked && chat?.meta?.contextUsagePercent != null)
+      );
+    }
+
+    /** Cursor only exposes the current window; transcript series is a rough timeline. */
+    function contextMetricsForChat(chat) {
+      const series = chat?.contextSeries || [];
+      const fromSeries = contextMetrics(series);
+      if (!usesCursorContext(chat)) return { ...fromSeries, windowSummarized: false, summarizedTokens: 0 };
+
+      const latest = Math.min(
+        100,
+        Math.round(chat.meta?.contextUsagePercent ?? fromSeries.latest)
+      );
+      const summarizedTokens = chat.contextBudget?.summarizedConversation ?? 0;
+      return {
+        peak: latest,
+        latest,
+        compressCount: 0,
+        windowSummarized: summarizedTokens > 0,
+        summarizedTokens,
+      };
+    }
+
+    function historyToChartSeries(points, mode) {
+      return points
+        .filter((p) => (mode === "percent" ? p.percent != null : p.usedTokens != null))
+        .map((p) => ({
+          percent: p.percent ?? 0,
+          usedTokens: p.usedTokens ?? 0,
+          limitTokens: p.limitTokens ?? 200000,
+          compress: p.event === "summarization",
+        }));
+    }
+
+    function isChatActivelyWatched(chatId) {
+      return state.watchStatus?.activeComposerIds?.includes(chatId);
+    }
+
+    function historyPeakLabel(points, mode) {
+      if (!points?.length) return "—";
+      if (mode === "tokens") {
+        const m = Math.max(...points.map((p) => p.usedTokens || 0));
+        return formatTokens(m);
+      }
+      const m = Math.max(...points.map((p) => p.percent || 0));
+      return `${Math.round(m)}%`;
+    }
+
+    function ledgerTotalTokensCard(chat) {
+      const stats = state.contextHistoryStats;
+      const peak = stats?.peakUsedTokens;
+      const peakPct = stats?.peakPercent;
+      const n = stats?.sampleCount ?? 0;
+      if (peak != null && n > 0) {
+        return `<div class="card"><div class="card-label">Total tokens (chat)</div><div class="card-value">${formatTokens(peak)}</div><div class="card-sub">Peak window while watched · ${n} samples${peakPct != null ? ` · high ${Math.round(peakPct)}%` : ""}</div></div>`;
+      }
+      return `<div class="card"><div class="card-label">Total tokens (chat)</div><div class="card-value">—</div><div class="card-sub">No ledger yet — server samples warm chats every 15s</div></div>`;
+    }
+
+    async function refreshChatHistory(chatId) {
+      const [histRes, watchRes] = await Promise.all([
+        fetch(`/api/history/${chatId}`),
+        fetch("/api/watch/status"),
+      ]);
+      if (!histRes.ok || !watchRes.ok) return;
+      const hist = await histRes.json();
+      const watch = await watchRes.json();
+      state.contextHistoryPoints = hist.points || [];
+      state.contextHistoryStats = hist.stats || null;
+      state.watchStatus = watch;
+    }
+
+    function syncHistoryPolling() {
+      if (!state.selectedChatId) {
+        historyPollingChatId = null;
+        if (historyPollTimer) clearInterval(historyPollTimer);
+        historyPollTimer = null;
+        state.contextHistoryPoints = [];
+        state.contextHistoryStats = null;
+        state.watchStatus = null;
+        return;
+      }
+      if (state.selectedChatId === historyPollingChatId && historyPollTimer) return;
+
+      if (historyPollTimer) clearInterval(historyPollTimer);
+      historyPollTimer = null;
+      const chatId = state.selectedChatId;
+      historyPollingChatId = chatId;
+      const tick = async () => {
+        try {
+          await refreshChatHistory(chatId);
+          if (state.selectedChatId !== chatId) return;
+          const repo = getRepo(state.selectedRepoId);
+          const chat = repo && getChat(repo, chatId);
+          if (chat) renderChatDashboard(repo, chat);
+        } catch {
+          /* server may be down */
+        }
+      };
+      tick();
+      historyPollTimer = setInterval(tick, 15000);
+    }
+
+    function renderContextGauge(percent) {
+      const p = Math.min(100, Math.max(0, Math.round(percent)));
+      return `<div class="context-gauge" style="margin:12px 0">
+        <div class="bar-track" style="height:14px;border-radius:4px"><div class="bar-fill" style="width:${p}%"></div></div>
+        <div class="card-sub" style="margin-top:6px">Current window <strong>${p}%</strong> (Cursor snapshot)</div>
+      </div>`;
+    }
+
+    function contextCompressionLabel(chat) {
+      const m = contextMetricsForChat(chat);
+      if (usesCursorContext(chat)) {
+        return m.windowSummarized
+          ? `Summarized in window · ${formatTokens(m.summarizedTokens)}`
+          : "No summarized slice in current window";
+      }
+      return `Compressions ${m.compressCount}`;
+    }
+
+    function mergeCounts(items, key = "name", countKey = "count") {
+      const map = new Map();
+      for (const item of items) {
+        const k = item[key];
+        const add = item[countKey] ?? 1;
+        map.set(k, (map.get(k) || 0) + add);
+      }
+      return [...map.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    }
+
+    function mergeTools(chats) {
+      const map = new Map();
+      for (const chat of chats) {
+        for (const t of chat.tools) {
+          const cur = map.get(t.name) || { name: t.name, success: 0, failure: 0 };
+          cur.success += t.success;
+          cur.failure += t.failure;
+          map.set(t.name, cur);
+        }
+      }
+      return [...map.values()].sort((a, b) => b.success + b.failure - (a.success + a.failure));
+    }
+
+    function toolColorIndex(name) {
+      let hash = 0;
+      for (let i = 0; i < name.length; i++) hash = (hash + name.charCodeAt(i) * 17) % TOOL_PALETTE.length;
+      return hash;
+    }
+
+    function toolsToMix(tools) {
+      return tools
+        .map((t) => ({ name: t.name, runs: t.success + t.failure }))
+        .filter((t) => t.runs > 0)
+        .sort((a, b) => b.runs - a.runs);
+    }
+
+    function countToolCalls(tools) {
+      return tools.reduce((sum, t) => sum + t.success + t.failure, 0);
+    }
+
+    function countToolFailures(tools) {
+      return tools.reduce((sum, t) => sum + t.failure, 0);
+    }
+
+    function emptyContextBudget() {
+      return Object.fromEntries(CONTEXT_BUDGET_ROWS.map((r) => [r.key, 0]));
+    }
+
+    function mergeContextBudget(chats) {
+      const merged = emptyContextBudget();
+      for (const chat of chats) {
+        const b = chat.contextBudget || emptyContextBudget();
+        for (const row of CONTEXT_BUDGET_ROWS) {
+          merged[row.key] += b[row.key] || 0;
+        }
+      }
+      return merged;
+    }
+
+    function contextBudgetTotal(budget) {
+      return CONTEXT_BUDGET_ROWS.reduce((sum, row) => sum + (budget[row.key] || 0), 0);
+    }
+
+    function formatTokens(n) {
+      if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+      if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+      return String(n);
+    }
+
+    function renderToolMix(tools) {
+      const mix = toolsToMix(tools);
+      if (!mix.length) return `<p class="card-sub">No tool runs recorded</p>`;
+      const total = mix.reduce((s, t) => s + t.runs, 0);
+      const segments = mix
+        .map((t, i) => {
+          const pct = (t.runs / total) * 100;
+          const color = TOOL_PALETTE[toolColorIndex(t.name)];
+          return `<div class="tool-mix-segment" style="width:${pct}%;background:${color}" title="${escapeHtml(t.name)}: ${t.runs} (${pct.toFixed(1)}%)"></div>`;
+        })
+        .join("");
+      const legend = mix
+        .map((t) => {
+          const pct = ((t.runs / total) * 100).toFixed(1);
+          const color = TOOL_PALETTE[toolColorIndex(t.name)];
+          return `<div class="tool-mix-item"><span class="tool-swatch" style="background:${color}"></span><strong>${escapeHtml(t.name)}</strong> ${t.runs} <span>(${pct}%)</span></div>`;
+        })
+        .join("");
+      return `
+        <div class="tool-mix-bar" role="img" aria-label="Tool usage mix">${segments}</div>
+        <div class="tool-mix-legend">${legend}</div>`;
+    }
+
+    function renderContextBudgetTable(budget, subtitle) {
+      const total = contextBudgetTotal(budget);
+      const rows = CONTEXT_BUDGET_ROWS
+        .map((row) => {
+          const tokens = budget[row.key] || 0;
+          const pct = total ? ((tokens / total) * 100).toFixed(1) : "0.0";
+          return `
+            <tr>
+              <td>
+                <div class="row-label">
+                  <span class="budget-swatch" style="background:${row.color}"></span>
+                  ${escapeHtml(row.label)}
+                </div>
+              </td>
+              <td class="num">${tokens.toLocaleString()}</td>
+              <td class="num">${formatTokens(tokens)}</td>
+              <td class="num">${pct}%</td>
+            </tr>`;
+        })
+        .join("");
+      return `
+        ${subtitle ? `<div class="card-sub" style="margin-bottom:10px">${escapeHtml(subtitle)}</div>` : ""}
+        <table class="data-table context-budget-table">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Tokens</th>
+              <th>Compact</th>
+              <th>Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+            <tr class="total-row">
+              <td>Total (estimated context payload)</td>
+              <td class="num">${total.toLocaleString()}</td>
+              <td class="num">${formatTokens(total)}</td>
+              <td class="num">100%</td>
+            </tr>
+          </tbody>
+        </table>`;
+    }
+
+    function uniqueFiles(chats) {
+      const byPath = new Map();
+      for (const chat of chats) {
+        for (const f of chat.files) {
+          if (!byPath.has(f.path)) byPath.set(f.path, f.action);
+        }
+      }
+      return [...byPath.entries()].map(([path, action]) => ({ path, action }));
+    }
+
+    function aggregateRepo(repo) {
+      const chats = repo.chats;
+      const statusCounts = { active: 0, completed: 0, abandoned: 0 };
+      chats.forEach((c) => statusCounts[c.status]++);
+
+      const activeSeconds = chats.reduce((s, c) => s + c.activeSeconds, 0);
+      const assistantChars = chats.reduce((s, c) => s + c.assistantChars, 0);
+      const userTurns = chats.reduce((s, c) => s + c.userTurns, 0);
+      const assistantTurns = chats.reduce((s, c) => s + c.assistantTurns, 0);
+
+      const files = uniqueFiles(chats);
+      const tools = mergeTools(chats);
+      const skills = mergeCounts(chats.flatMap((c) => c.skills));
+      const agents = mergeCounts(chats.flatMap((c) => c.agents));
+      const commands = mergeCounts(chats.flatMap((c) => c.commands));
+
+      let highestPeak = 0;
+      let totalCompress = 0;
+      let latestSum = 0;
+      const recentBars = [...chats]
+        .sort((a, b) => new Date(b.lastActive) - new Date(a.lastActive))
+        .slice(0, 8)
+        .map((c) => {
+          const m = contextMetricsForChat(c);
+          highestPeak = Math.max(highestPeak, m.peak);
+          if (!usesCursorContext(c)) totalCompress += m.compressCount;
+          else if (m.windowSummarized) totalCompress += 1;
+          latestSum += m.latest;
+          return { chatId: c.id, title: c.title, peak: m.peak };
+        });
+
+      const avgLatest = chats.length ? Math.round(latestSum / chats.length) : 0;
+
+      const subAgentEntries = [];
+      chats.forEach((c) => {
+        c.subAgents.forEach((sa) => {
+          subAgentEntries.push({ ...sa, chatId: c.id, chatTitle: c.title });
+        });
+      });
+
+      const byActive = [...chats].sort((a, b) => b.activeSeconds - a.activeSeconds)[0] || null;
+      const byFiles = [...chats].sort((a, b) => b.files.length - a.files.length)[0] || null;
+
+      const models = [...new Set(chats.flatMap((c) => c.models))];
+      const contextBudget = mergeContextBudget(chats);
+      const toolCalls = countToolCalls(tools);
+      const toolFailures = countToolFailures(tools);
+
+      return {
+        statusCounts,
+        activeSeconds,
+        assistantChars,
+        userTurns,
+        assistantTurns,
+        files,
+        tools,
+        skills,
+        agents,
+        commands,
+        highestPeak,
+        avgLatest,
+        totalCompress,
+        recentBars,
+        subAgentEntries,
+        subAgentTotal: subAgentEntries.length,
+        highlights: { byActive, byFiles },
+        models,
+        contextBudget,
+        toolCalls,
+        toolFailures,
+      };
+    }
+
+    function renderSidebar() {
+      const el = document.getElementById("repo-list");
+      el.innerHTML = MOCK_DATA.repositories
+        .map((repo) => {
+          const expanded = state.expandedRepoIds.has(repo.id);
+          const repoSelected = state.selectedRepoId === repo.id && !state.selectedChatId;
+          const visible = state.visibleChatCount[repo.id] ?? 5;
+          const sorted = [...repo.chats].sort((a, b) => new Date(b.lastActive) - new Date(a.lastActive));
+          const shown = sorted.slice(0, visible);
+          const hasMore = visible < sorted.length;
+
+          const chatsHtml = shown
+            .map((chat) => {
+              const sel = state.selectedChatId === chat.id;
+              return `
+                <div class="chat-row ${sel ? "selected" : ""}" data-chat-id="${chat.id}" data-repo-id="${repo.id}">
+                  <div class="chat-row-top">
+                    <span class="status-dot ${chat.status}"></span>
+                    <span class="chat-title">${escapeHtml(chat.title)}</span>
+                  </div>
+                  <span class="chat-time">${formatRelative(chat.lastActive)}</span>
+                </div>`;
+            })
+            .join("");
+
+          const moreHtml = hasMore
+            ? `<button type="button" class="more-btn" data-repo-id="${repo.id}">More (${sorted.length - visible} remaining)</button>`
+            : "";
+
+          return `
+            <div class="repo-block ${expanded ? "expanded" : ""}" data-repo-id="${repo.id}">
+              <div class="repo-row ${repoSelected ? "selected" : ""}" data-repo-id="${repo.id}">
+                <svg class="chevron" viewBox="0 0 16 16" fill="currentColor"><path d="M6 4l4 4-4 4V4z"/></svg>
+                <span class="repo-name">${escapeHtml(repo.name)}</span>
+              </div>
+              <div class="chat-list">
+                ${chatsHtml}
+                ${moreHtml}
+              </div>
+            </div>`;
+        })
+        .join("");
+
+      el.querySelectorAll(".repo-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          const repoId = row.dataset.repoId;
+          if (state.expandedRepoIds.has(repoId)) {
+            state.expandedRepoIds.add(repoId);
+          } else {
+            state.expandedRepoIds.add(repoId);
+          }
+          state.selectedRepoId = repoId;
+          state.selectedChatId = null;
+          render();
+        });
+      });
+
+      el.querySelectorAll(".chat-row").forEach((row) => {
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          state.selectedRepoId = row.dataset.repoId;
+          state.selectedChatId = row.dataset.chatId;
+          state.expandedRepoIds.add(row.dataset.repoId);
+          render();
+        });
+      });
+
+      el.querySelectorAll(".more-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const repoId = btn.dataset.repoId;
+          const cur = state.visibleChatCount[repoId] ?? 5;
+          state.visibleChatCount[repoId] = cur + 5;
+          render();
+        });
+      });
+    }
+
+    function renderContextChart(series, height = 120, { mode = "percent" } = {}) {
+      if (!series.length) return "";
+      const width = 600;
+      const pad = { t: 8, r: 8, b: 20, l: 32 };
+      const innerW = width - pad.l - pad.r;
+      const innerH = height - pad.t - pad.b;
+      const yMax =
+        mode === "tokens"
+          ? Math.max(...series.map((p) => p.limitTokens || p.usedTokens || 1), 1)
+          : 100;
+      const chartSeries =
+        series.length === 1
+          ? [series[0], series[0]]
+          : series;
+      const pts = chartSeries.map((p, i) => {
+        const x = pad.l + (i / Math.max(1, chartSeries.length - 1)) * innerW;
+        const value = mode === "tokens" ? p.usedTokens ?? 0 : p.percent ?? 0;
+        const y = pad.t + innerH - (value / yMax) * innerH;
+        return { x, y, ...p };
+      });
+      const lineD = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+      const areaD = `${lineD} L ${pts[pts.length - 1].x} ${pad.t + innerH} L ${pts[0].x} ${pad.t + innerH} Z`;
+      const compressLines = pts
+        .filter((p) => p.compress)
+        .map(
+          (p) =>
+            `<line class="compress-marker" x1="${p.x}" y1="${pad.t}" x2="${p.x}" y2="${pad.t + innerH}" />`
+        )
+        .join("");
+      return `
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+          <path class="chart-area" d="${areaD}" />
+          <path class="chart-line" d="${lineD}" />
+          ${compressLines}
+        </svg>`;
+    }
+
+    function renderCountTable(items, columns) {
+      if (!items.length) return `<p class="card-sub">None recorded</p>`;
+      const heads = columns.map((c) => `<th>${c.label}</th>`).join("");
+      const rows = items
+        .map((item) => {
+          const cells = columns.map((c) => `<td class="num">${c.render(item)}</td>`).join("");
+          return `<tr>${cells}</tr>`;
+        })
+        .join("");
+      return `<table class="data-table"><thead><tr>${heads}</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function fieldSourceLabel(src) {
+      if (src === "cursor-composer") return "Source: Cursor composer (global storage)";
+      if (src === "cursor-composer-session-span") return "Source: Cursor created → last updated span";
+      if (src === "agent-transcript") return "Source: agent transcript JSONL";
+      return "";
+    }
+
+    function cardSourceSub(chat, field) {
+      const label = fieldSourceLabel(chat?.meta?.fieldSources?.[field]);
+      return label ? `<div class="card-sub">${label}</div>` : "";
+    }
+
+    function turnsCardSub(chat) {
+      const bubbles = chat.meta?.composerAssistantBubbles;
+      const userFromCursor = chat.meta?.fieldSources?.userTurns === "cursor-composer";
+      if (userFromCursor && bubbles != null) {
+        return `${chat.userTurns} user (composer) · ${chat.assistantTurns} assistant (transcript) · ${bubbles} composer bubbles (thinking/tools)`;
+      }
+      return `${chat.userTurns} user · ${chat.assistantTurns} assistant`;
+    }
+
+    function subAgentCount(chat) {
+      if (chat.meta?.fieldSources?.subAgents === "cursor-composer" && chat.meta?.numSubComposers != null) {
+        return chat.meta.numSubComposers;
+      }
+      return chat.subAgents.length;
+    }
+
+    function contextSectionTitle(chat) {
+      return usesCursorContext(chat) ? "Context (from Cursor)" : "Context (estimated)";
+    }
+
+    function contextCompositionNote(chat) {
+      if (usesCursorContext(chat)) {
+        return "Current prompt window only (matches Cursor’s Context Usage popover). System, tools, rules, skills, and MCP reflect what is attached now—they are not reset after compression. Conversation shrinks via summarization; check “Summarized conversation” tokens.";
+      }
+      return "Rough estimate from transcript text (char÷4). Will not match Cursor’s tokenizer or live window—open this chat via npm start with composer linked for live numbers.";
+    }
+
+    function renderComposerContextHint(chat) {
+      if (usesCursorContext(chat)) return "";
+      const est = contextMetrics(chat.contextSeries || []).latest;
+      return `<div class="data-banner" style="margin-bottom:12px"><strong>Transcript estimate only</strong> — showing ~${est}% context from JSONL. Cursor’s live window (often much higher) needs composer data for this chat id. Hard-refresh after <code>npm start</code>, or use <button type="button" class="more-btn" id="refresh-data-inline">Refresh data</button>.</div>`;
+    }
+
+    function compressionChartNote(chat) {
+      if (usesCursorContext(chat)) {
+        const summarized = chat.contextBudget?.summarizedConversation ?? 0;
+        const used = chat.meta?.contextTokensUsed;
+        const limit = chat.meta?.contextTokenLimit;
+        const pct = chat.meta?.contextUsagePercent;
+        const tok =
+          used != null && limit != null
+            ? ` <strong>${Math.round(pct ?? 0)}%</strong> · ~${formatTokens(used)} / ${formatTokens(limit)} tokens.`
+            : "";
+        return `Cursor only stores the <strong>current</strong> window.${tok} Summarized slice: ${formatTokens(summarized)}. The <strong>Context memory</strong> chart below is built from local samples (15s while this chat is in the active watch set).`;
+      }
+      const n = contextMetrics(chat.contextSeries).compressCount;
+      if (n > 0) {
+        return "Dashed lines mark context compression events recorded in the agent transcript.";
+      }
+      return "No context compressions detected in this transcript. <code>[REDACTED]</code> lines are export privacy redaction, not window compression.";
+    }
+
+    function renderDataBanner() {
+      if (!DATA_META.chatSource) return "";
+      return `<div class="data-banner"><strong>Live data</strong> — ${DATA_META.chatCount || 0} agent transcripts across ${DATA_META.repositoryCount || 0} workspaces. Context table &amp; % use <strong>Cursor composer state</strong> when available (read-only); otherwise estimated from the transcript.</div>`;
+    }
+
+    function renderRepoOverview(repo) {
+      const agg = aggregateRepo(repo);
+      const main = document.getElementById("main");
+
+      main.innerHTML = `
+        ${renderDataBanner()}
+        <header class="main-header">
+          <h1 class="main-title">${escapeHtml(repo.name)}</h1>
+          <div class="main-meta">
+            <span>${repo.chats.length} chats</span>
+            <span class="meta-pill"><span class="status-dot active"></span> ${agg.statusCounts.active} active</span>
+            <span class="meta-pill"><span class="status-dot completed"></span> ${agg.statusCounts.completed} completed</span>
+            <span class="meta-pill"><span class="status-dot abandoned"></span> ${agg.statusCounts.abandoned} abandoned</span>
+          </div>
+        </header>
+
+        <div class="highlights">
+          ${agg.highlights.byActive ? `<button type="button" class="highlight-chip" data-goto-chat="${agg.highlights.byActive.id}">
+            <strong>Most active time</strong> · <span>${escapeHtml(agg.highlights.byActive.title)} (${formatDuration(agg.highlights.byActive.activeSeconds)})</span>
+          </button>` : ""}
+          ${agg.highlights.byFiles ? `<button type="button" class="highlight-chip" data-goto-chat="${agg.highlights.byFiles.id}">
+            <strong>Most files touched</strong> · <span>${escapeHtml(agg.highlights.byFiles.title)} (${agg.highlights.byFiles.files.length} files)</span>
+          </button>` : ""}
+        </div>
+
+        <div class="cards">
+          <div class="card"><div class="card-label">Active time</div><div class="card-value">${formatDuration(agg.activeSeconds)}</div><div class="card-sub">Agent working time (idle excluded)</div></div>
+          <div class="card"><div class="card-label">Tool calls</div><div class="card-value">${agg.toolCalls.toLocaleString()}</div><div class="card-sub">${agg.toolFailures} failed · ${agg.toolCalls - agg.toolFailures} ok</div></div>
+          <div class="card"><div class="card-label">Sub-agents</div><div class="card-value">${agg.subAgentTotal}</div><div class="card-sub">Spawned across all chats</div></div>
+          <div class="card"><div class="card-label">Files touched</div><div class="card-value">${agg.files.length}</div><div class="card-sub">Unique paths (writes only)</div></div>
+          <div class="card"><div class="card-label">Output size</div><div class="card-value">${formatChars(agg.assistantChars)}</div><div class="card-sub">${agg.assistantChars.toLocaleString()} assistant chars</div></div>
+          <div class="card"><div class="card-label">Turns</div><div class="card-value">${agg.userTurns + agg.assistantTurns}</div><div class="card-sub">${agg.userTurns} user · ${agg.assistantTurns} assistant</div></div>
+          <div class="card"><div class="card-label">Context peak</div><div class="card-value">${agg.highestPeak}%</div><div class="card-sub">Highest across chats · ${agg.totalCompress} compressions</div></div>
+          <div class="card"><div class="card-label">Models</div><div class="card-value models-list" style="font-size:14px;font-weight:500">${escapeHtml(agg.models.join(" → "))}</div></div>
+        </div>
+
+        <section class="section">
+          <h2 class="section-title">Context</h2>
+          <div class="panel">
+            <div class="context-stats">
+              <span>Highest peak <strong>${agg.highestPeak}%</strong></span>
+              <span>Avg latest <strong>${agg.avgLatest}%</strong></span>
+              <span>Compressions <strong>${agg.totalCompress}</strong></span>
+            </div>
+            <div class="bar-chart">
+              ${agg.recentBars
+                .map(
+                  (b) => `
+                <div class="bar-row">
+                  <span class="bar-label" title="${escapeHtml(b.title)}">${escapeHtml(b.title)}</span>
+                  <div class="bar-track"><div class="bar-fill" style="width:${b.peak}%"></div></div>
+                  <span class="bar-pct">${b.peak}%</span>
+                </div>`
+                )
+                .join("")}
+            </div>
+            <div class="card-sub" style="margin-top:10px">Peak context % per recent chat (not a single repo timeline)</div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Context composition</h2>
+          <div class="panel">
+            ${renderContextBudgetTable(
+              agg.contextBudget,
+              "Summed across chats. Chats with Cursor composer data use live token breakdown; others use transcript estimates."
+            )}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Tools</h2>
+          <div class="panel">
+            <div class="card-label" style="margin-bottom:10px">Tool mix</div>
+            ${renderToolMix(agg.tools)}
+            ${renderCountTable(agg.tools, [
+              { label: "Tool", render: (t) => escapeHtml(t.name) },
+              { label: "Runs", render: (t) => t.success + t.failure },
+              { label: "Success", render: (t) => `<span class="ok">${t.success}</span>` },
+              { label: "Failure", render: (t) => `<span class="fail">${t.failure}</span>` },
+            ])}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Skills · Agents · Commands</h2>
+          <div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Skills</div>
+              ${renderCountTable(agg.skills, [
+                { label: "Skill", render: (s) => escapeHtml(s.name) },
+                { label: "Uses", render: (s) => s.count },
+              ])}
+            </div>
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Agents</div>
+              ${renderCountTable(agg.agents, [
+                { label: "Agent", render: (a) => escapeHtml(a.name) },
+                { label: "Uses", render: (a) => a.count },
+              ])}
+            </div>
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Commands</div>
+              ${renderCountTable(agg.commands, [
+                { label: "Command", render: (c) => escapeHtml(c.name) },
+                { label: "Uses", render: (c) => c.count },
+              ])}
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Sub-agents (${agg.subAgentTotal} total)</h2>
+          <div class="panel">
+            ${agg.subAgentEntries.length
+              ? `<table class="data-table">
+              <thead><tr><th>Type</th><th>Heading</th><th>Chat</th></tr></thead>
+              <tbody>
+                ${agg.subAgentEntries
+                  .map(
+                    (sa) => `
+                  <tr>
+                    <td>${escapeHtml(sa.type)}</td>
+                    <td>${escapeHtml(sa.heading)}</td>
+                    <td><button type="button" class="highlight-chip" style="padding:4px 8px;margin:0" data-goto-chat="${sa.chatId}">${escapeHtml(sa.chatTitle)}</button></td>
+                  </tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>`
+              : `<p class="card-sub">None recorded</p>`}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Files (unique)</h2>
+          <div class="panel">
+            ${renderFileList(agg.files)}
+          </div>
+        </section>
+      `;
+
+      main.querySelectorAll("[data-goto-chat]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.selectedChatId = btn.dataset.gotoChat;
+          render();
+        });
+      });
+    }
+
+    function renderFileList(files) {
+      if (!files.length) return `<p class="card-sub">None</p>`;
+      return files
+        .map(
+          (f) =>
+            `<div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+              <span class="action-tag ${f.action}">${f.action}</span>
+              <span class="file-path">${escapeHtml(f.path)}</span>
+            </div>`
+        )
+        .join("");
+    }
+
+    function renderChatDashboard(repo, chat) {
+      const ctx = contextMetricsForChat(chat);
+      const toolCalls = countToolCalls(chat.tools);
+      const toolFails = countToolFailures(chat.tools);
+      const main = document.getElementById("main");
+      const modelLabel = chat.models.length > 1 ? chat.models.join(" → ") : chat.models[0] || "—";
+
+      main.innerHTML = `
+        ${renderDataBanner()}
+        ${renderComposerContextHint(chat)}
+        <header class="main-header">
+          <h1 class="main-title">${escapeHtml(chat.title)}</h1>
+          <div class="main-meta">
+            <span class="badge ${chat.status}">${chat.status}</span>
+            <span>Started ${formatDateTime(chat.started)}</span>
+            <span>Last active ${formatRelative(chat.lastActive)}</span>
+            <span>Model ${escapeHtml(modelLabel)}</span>
+            ${chat.meta?.composerLinked ? `<span title="Fields merged from Cursor global storage when composer id matches transcript id">Composer linked</span>` : ""}
+            <span style="color:var(--text-dim)">in ${escapeHtml(repo.name)}</span>
+          </div>
+        </header>
+
+        <div class="cards">
+          <div class="card"><div class="card-label">Active duration</div><div class="card-value">${formatDuration(chat.activeSeconds)}</div>${cardSourceSub(chat, "activeSeconds")}</div>
+          ${ledgerTotalTokensCard(chat)}
+          <div class="card"><div class="card-label">Tool calls</div><div class="card-value">${toolCalls.toLocaleString()}</div><div class="card-sub">${toolFails} failed · ${toolCalls - toolFails} ok</div>${cardSourceSub(chat, "tools")}</div>
+          <div class="card"><div class="card-label">Sub-agents</div><div class="card-value">${subAgentCount(chat)}</div><div class="card-sub">Sub-composers in Cursor</div>${cardSourceSub(chat, "subAgents")}</div>
+          <div class="card"><div class="card-label">Context now</div><div class="card-value">${ctx.latest}%</div><div class="card-sub">${usesCursorContext(chat) ? "Current Cursor window" : "Estimated"} · ${contextCompressionLabel(chat)}</div>${cardSourceSub(chat, "contextSeries")}</div>
+          <div class="card"><div class="card-label">Files touched</div><div class="card-value">${chat.files.length}</div><div class="card-sub">Created, edited, or deleted</div>${cardSourceSub(chat, "files")}</div>
+          <div class="card"><div class="card-label">Output size</div><div class="card-value">${formatChars(chat.assistantChars)}</div><div class="card-sub">${chat.assistantChars.toLocaleString()} assistant chars</div>${cardSourceSub(chat, "assistantChars")}</div>
+          <div class="card"><div class="card-label">Turns</div><div class="card-value">${chat.userTurns + chat.assistantTurns}</div><div class="card-sub">${turnsCardSub(chat)}</div></div>
+        </div>
+
+        <section class="section">
+          <h2 class="section-title">${contextSectionTitle(chat)}</h2>
+          <div class="panel">
+            <div class="context-stats">
+              <span>Window <strong>${ctx.latest}%</strong></span>
+              <span>${usesCursorContext(chat) ? "Summarized" : "Compressions"} <strong>${usesCursorContext(chat) ? (ctx.windowSummarized ? formatTokens(ctx.summarizedTokens) : "—") : ctx.compressCount}</strong></span>
+              ${usesCursorContext(chat) && chat.meta.contextTokensUsed != null ? `<span>Cursor <strong>${Math.round(chat.meta.contextUsagePercent ?? ctx.latest)}%</strong> · ~${formatTokens(chat.meta.contextTokensUsed)} / ${formatTokens(chat.meta.contextTokenLimit)}</span>` : ""}
+            </div>
+            ${usesCursorContext(chat) ? renderContextGauge(ctx.latest) : `<div class="chart-wrap">${renderContextChart(chat.contextSeries || [])}</div>`}
+            <div class="card-sub" style="margin-top:8px">${compressionChartNote(chat)}</div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Context memory (local ledger)</h2>
+          <div class="panel">
+            <div class="context-stats" style="margin-bottom:10px">
+              <span>${isChatActivelyWatched(chat.id) ? '<span class="badge active">Watching · 15s samples</span>' : "Not in watch set (updated in Cursor within last hour, max 5 chats)"}</span>
+              <span>Samples <strong>${state.contextHistoryPoints.length}</strong></span>
+              <span>Peak seen <strong>${historyPeakLabel(state.contextHistoryPoints, state.historyYMode)}</strong></span>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:10px">
+              <button type="button" class="more-btn history-y-toggle ${state.historyYMode === "percent" ? "active-toggle" : ""}" data-y-mode="percent">% used</button>
+              <button type="button" class="more-btn history-y-toggle ${state.historyYMode === "tokens" ? "active-toggle" : ""}" data-y-mode="tokens">Tokens used</button>
+            </div>
+            ${
+              state.contextHistoryPoints.length >= 2
+                ? `<div class="chart-wrap">${renderContextChart(
+                    historyToChartSeries(state.contextHistoryPoints, state.historyYMode),
+                    140,
+                    { mode: state.historyYMode }
+                  )}</div>
+                  <div class="card-sub" style="margin-top:8px">Dashed vertical marks = inferred summarization between samples. Discovery every 10m adds warm chats (≤1h idle). Stored under <code>~/.context-ledger/history/</code>.</div>`
+                : `<p class="card-sub">Need at least 2 samples. Keep this server running while the chat is active in Cursor (updated within the last hour).</p>`
+            }
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Context composition</h2>
+          <div class="panel">
+            ${renderContextBudgetTable(
+              chat.contextBudget || emptyContextBudget(),
+              contextCompositionNote(chat)
+            )}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Tools</h2>
+          <div class="panel">
+            <div class="card-label" style="margin-bottom:10px">Tool mix</div>
+            ${renderToolMix(chat.tools)}
+            ${renderCountTable(chat.tools, [
+              { label: "Tool", render: (t) => escapeHtml(t.name) },
+              { label: "Runs", render: (t) => t.success + t.failure },
+              { label: "Success", render: (t) => `<span class="ok">${t.success}</span>` },
+              { label: "Failure", render: (t) => `<span class="fail">${t.failure}</span>` },
+            ])}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Skills · Agents · Commands</h2>
+          <div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Skills</div>
+              <div class="card-sub" style="margin-bottom:8px">Invocation counts from transcript. Context table “skills” row is token budget from Cursor when linked.</div>
+              ${renderCountTable(chat.skills, [
+                { label: "Skill", render: (s) => escapeHtml(s.name) },
+                { label: "Uses", render: (s) => s.count },
+              ])}
+            </div>
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Agents</div>
+              ${renderCountTable(chat.agents, [
+                { label: "Agent", render: (a) => escapeHtml(a.name) },
+                { label: "Uses", render: (a) => a.count },
+              ])}
+            </div>
+            <div>
+              <div class="card-label" style="margin-bottom:8px">Commands</div>
+              ${renderCountTable(chat.commands, [
+                { label: "Command", render: (c) => escapeHtml(c.name) },
+                { label: "Uses", render: (c) => c.count },
+              ])}
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Sub-agents (${chat.subAgents.length})</h2>
+          <div class="panel">
+            ${chat.subAgents.length
+              ? `<table class="data-table">
+              <thead><tr><th>Type</th><th>Heading</th></tr></thead>
+              <tbody>
+                ${chat.subAgents
+                  .map(
+                    (sa) => `<tr><td>${escapeHtml(sa.type)}</td><td>${escapeHtml(sa.heading)}</td></tr>`
+                  )
+                  .join("")}
+              </tbody>
+            </table>`
+              : `<p class="card-sub">None recorded</p>`}
+          </div>
+        </section>
+
+        <section class="section">
+          <h2 class="section-title">Files</h2>
+          <div class="panel">${renderFileList(chat.files)}</div>
+        </section>
+      `;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function render() {
+      renderSidebar();
+      const repo = getRepo(state.selectedRepoId);
+      if (!repo) {
+        document.getElementById("main").innerHTML = `<div class="empty-state">Select a repository</div>`;
+        syncHistoryPolling();
+        return;
+      }
+      if (state.selectedChatId) {
+        const chat = getChat(repo, state.selectedChatId);
+        if (chat) {
+          renderChatDashboard(repo, chat);
+          syncHistoryPolling();
+        } else {
+          state.selectedChatId = null;
+          renderRepoOverview(repo);
+          syncHistoryPolling();
+        }
+      } else {
+        renderRepoOverview(repo);
+        syncHistoryPolling();
+      }
+    }
+
+    document.getElementById("app-name").textContent = APP_BRAND.name;
+    document.getElementById("app-tagline").textContent = APP_BRAND.tagline;
+    document.title = `${APP_BRAND.name} — ${APP_BRAND.tagline}`;
+
+    function pickInitialRepo() {
+      const repos = MOCK_DATA.repositories;
+      if (!repos.length) return;
+      const preferred =
+        repos.find((r) => r.name === "CursorMonitor") ||
+        repos.find((r) => r.folderPath?.includes("CursorMonitor")) ||
+        repos.reduce((a, b) => (a.chats.length >= b.chats.length ? a : b), repos[0]);
+      state.selectedRepoId = preferred.id;
+      state.expandedRepoIds.add(preferred.id);
+      state.visibleChatCount[preferred.id] = 5;
+    }
+
+    async function loadDataFromApi() {
+      const res = await fetch("/api/refresh");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const payload = await res.json();
+      MOCK_DATA = { repositories: payload.repositories || [] };
+      DATA_META = payload.meta || {};
+    }
+
+    async function bootstrap() {
+      document.getElementById("main").innerHTML =
+        `<div class="empty-state">Loading chats from ~/.cursor…</div>`;
+      try {
+        await loadDataFromApi();
+        pickInitialRepo();
+        render();
+      } catch (err) {
+        document.getElementById("main").innerHTML = `<div class="empty-state">Could not load data. Run <code>npm start</code> in this folder and open <code>http://localhost:3847</code>.<br><br>${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    document.addEventListener("click", async (e) => {
+      const yBtn = e.target.closest(".history-y-toggle");
+      if (yBtn?.dataset.yMode) {
+        state.historyYMode = yBtn.dataset.yMode;
+        render();
+        return;
+      }
+      if (e.target.id !== "refresh-data-inline") return;
+      e.preventDefault();
+      try {
+        await loadDataFromApi();
+        render();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    bootstrap();
+  </script>
+</body>
+</html>
