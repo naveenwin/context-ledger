@@ -345,6 +345,10 @@
       margin-top: 8px;
     }
 
+    .chart-wrap.chart-wrap-ledger {
+      height: 168px;
+    }
+
     .chart-wrap svg {
       width: 100%;
       height: 100%;
@@ -354,6 +358,18 @@
     .chart-line { fill: none; stroke: var(--accent); stroke-width: 2; }
     .chart-area { fill: var(--accent-dim); }
     .compress-marker { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 4 3; }
+    .chart-grid-line { stroke: rgba(80, 80, 80, 0.45); stroke-width: 1; }
+    .chart-axis-line { stroke: var(--text-muted); stroke-width: 1; }
+    .chart-axis-label {
+      fill: var(--text-dim);
+      font-size: 9px;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
+    .chart-axis-title {
+      fill: var(--text-muted);
+      font-size: 9px;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
 
     .bar-chart {
       display: flex;
@@ -394,6 +410,100 @@
       text-align: right;
       color: var(--text-dim);
       font-variant-numeric: tabular-nums;
+    }
+
+    .composition-bar-row {
+      grid-template-columns: minmax(0, 148px) minmax(0, 1fr) 56px;
+    }
+
+    .composition-bar-row .bar-pct {
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .chat-composition-block {
+      padding: 12px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .chat-composition-block:first-child {
+      border-top: none;
+      padding-top: 4px;
+    }
+
+    .chat-composition-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+
+    .chat-composition-title {
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-composition-total {
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .prompt-bars {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .prompt-bar-row {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr) 52px;
+      gap: 8px;
+      align-items: center;
+      font-size: 11px;
+    }
+
+    .prompt-bar-label {
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .prompt-bar-track {
+      height: 10px;
+      background: var(--bg-main);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .prompt-bar-fill {
+      display: flex;
+      height: 100%;
+      min-width: 2px;
+    }
+
+    .prompt-bar-seg {
+      height: 100%;
+    }
+
+    .prompt-bar-total {
+      text-align: right;
+      color: var(--text-dim);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .prompt-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      margin-top: 10px;
     }
 
     table.data-table {
@@ -684,7 +794,71 @@
           usedTokens: p.usedTokens ?? 0,
           limitTokens: p.limitTokens ?? 200000,
           compress: p.event === "summarization",
+          ts: p.ts ?? null,
         }));
+    }
+
+    function formatChartTimeLabel(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+
+    function chartYAxisMax(series, mode) {
+      const values = series.map((p) => (mode === "tokens" ? p.usedTokens ?? 0 : p.percent ?? 0));
+      const dataMax = Math.max(...values, 0);
+      if (mode === "tokens") {
+        if (dataMax <= 0) return 1000;
+        const headroom = Math.max(dataMax * 0.08, 1000);
+        return Math.ceil((dataMax + headroom) / 1000) * 1000;
+      }
+      return Math.min(100, Math.max(100, Math.ceil((dataMax + 5) / 5) * 5));
+    }
+
+    function chartYTicks(yMax, mode) {
+      if (mode === "tokens") {
+        const step = yMax <= 5000 ? 1000 : yMax <= 50000 ? 10000 : yMax <= 200000 ? 25000 : 50000;
+        const ticks = [];
+        for (let v = 0; v <= yMax; v += step) ticks.push(v);
+        if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax);
+        return ticks;
+      }
+      const step = yMax <= 50 ? 10 : 25;
+      const ticks = [];
+      for (let v = 0; v <= yMax; v += step) ticks.push(v);
+      if (ticks[ticks.length - 1] !== yMax) ticks.push(yMax);
+      return ticks;
+    }
+
+    function formatChartYTick(value, mode) {
+      if (mode === "tokens") return formatTokens(value);
+      return `${Math.round(value)}%`;
+    }
+
+    function mergeModelLabels(...lists) {
+      const out = [];
+      for (const list of lists) {
+        for (const raw of list || []) {
+          const name = String(raw || "").trim();
+          if (!name) continue;
+          if (!out.some((existing) => existing.toLowerCase() === name.toLowerCase())) {
+            out.push(name);
+          }
+        }
+      }
+      return out;
+    }
+
+    function modelsForChat(chat, historyPoints) {
+      const fromLedger = (historyPoints || [])
+        .filter((point) => point.trigger === "user_prompt" && point.model)
+        .map((point) => point.model);
+      return mergeModelLabels(chat.models, fromLedger);
     }
 
     function isChatActivelyWatched(chatId) {
@@ -866,47 +1040,166 @@
         <div class="tool-mix-legend">${legend}</div>`;
     }
 
-    function renderContextBudgetTable(budget, subtitle) {
+    function promptBarPoints(points) {
+      return (points || []).filter((point) => point && point.trigger === "user_prompt").slice(-20);
+    }
+
+    function promptBarTotal(point) {
+      if (point.budget) {
+        const sum = CONTEXT_BUDGET_ROWS.reduce((sum, row) => sum + (point.budget[row.key] || 0), 0);
+        if (sum > 0) return sum;
+      }
+      return point.usedTokens || 0;
+    }
+
+    function renderContextBudgetBarRows(budget) {
       const total = contextBudgetTotal(budget);
+      if (!total) {
+        return `<p class="card-sub">No composition data for this view.</p>`;
+      }
+      const max = Math.max(...CONTEXT_BUDGET_ROWS.map((row) => budget[row.key] || 0), 1);
       const rows = CONTEXT_BUDGET_ROWS
+        .filter((row) => (budget[row.key] || 0) > 0)
         .map((row) => {
           const tokens = budget[row.key] || 0;
-          const pct = total ? ((tokens / total) * 100).toFixed(1) : "0.0";
-          return `
-            <tr>
-              <td>
-                <div class="row-label">
-                  <span class="budget-swatch" style="background:${row.color}"></span>
-                  ${escapeHtml(row.label)}
-                </div>
-              </td>
-              <td class="num">${tokens.toLocaleString()}</td>
-              <td class="num">${formatTokens(tokens)}</td>
-              <td class="num">${pct}%</td>
-            </tr>`;
+          const width = Math.max(1.5, (tokens / max) * 100);
+          return `<div class="bar-row composition-bar-row">
+              <span class="bar-label" title="${escapeHtml(row.label)}">
+                <span class="budget-swatch" style="background:${row.color};margin-right:6px"></span>${escapeHtml(row.label)}
+              </span>
+              <div class="bar-track"><div class="bar-fill" style="width:${width}%;background:${row.color}"></div></div>
+              <span class="bar-pct">${formatTokens(tokens)}</span>
+            </div>`;
+        })
+        .join("");
+      return `<div class="bar-chart">${rows}</div>`;
+    }
+
+    function renderContextBudgetMixBar(budget, { compactLegend = false } = {}) {
+      const total = contextBudgetTotal(budget);
+      if (!total) return "";
+      const segments = CONTEXT_BUDGET_ROWS
+        .map((row) => {
+          const tokens = budget[row.key] || 0;
+          if (!tokens) return "";
+          const pct = (tokens / total) * 100;
+          return `<div class="tool-mix-segment" style="width:${pct}%;background:${row.color}" title="${escapeHtml(row.label)}: ${tokens.toLocaleString()} (${pct.toFixed(1)}%)"></div>`;
+        })
+        .join("");
+      const legend = CONTEXT_BUDGET_ROWS
+        .filter((row) => (budget[row.key] || 0) > 0)
+        .map((row) => {
+          const tokens = budget[row.key] || 0;
+          const pct = ((tokens / total) * 100).toFixed(1);
+          if (compactLegend) {
+            return `<span class="tool-mix-item"><span class="tool-swatch" style="background:${row.color}"></span>${escapeHtml(row.label)} ${pct}%</span>`;
+          }
+          return `<div class="tool-mix-item"><span class="tool-swatch" style="background:${row.color}"></span><strong>${escapeHtml(row.label)}</strong> ${formatTokens(tokens)} <span>(${pct}%)</span></div>`;
         })
         .join("");
       return `
-        ${subtitle ? `<div class="card-sub" style="margin-bottom:10px">${escapeHtml(subtitle)}</div>` : ""}
-        <table class="data-table context-budget-table">
-          <thead>
-            <tr>
-              <th>Component</th>
-              <th>Tokens</th>
-              <th>Compact</th>
-              <th>Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-            <tr class="total-row">
-              <td>Total (estimated context payload)</td>
-              <td class="num">${total.toLocaleString()}</td>
-              <td class="num">${formatTokens(total)}</td>
-              <td class="num">100%</td>
-            </tr>
-          </tbody>
-        </table>`;
+        <div class="tool-mix-bar" role="img" aria-label="Context window mix">${segments}</div>
+        <div class="tool-mix-legend">${legend}</div>`;
+    }
+
+    function renderContextCompositionPanel({ budget, subtitle, historyPoints = null }) {
+      const total = contextBudgetTotal(budget);
+      const parts = [];
+      if (subtitle) {
+        parts.push(`<div class="card-sub" style="margin-bottom:12px">${escapeHtml(subtitle)}</div>`);
+      }
+      if (!total) {
+        parts.push(`<p class="card-sub">No token breakdown yet.</p>`);
+      } else {
+        parts.push(renderContextBudgetBarRows(budget));
+        parts.push(
+          `<div style="margin-top:14px">
+            <div class="card-label" style="margin-bottom:8px">Window mix</div>
+            ${renderContextBudgetMixBar(budget)}
+            <div class="card-sub" style="margin-top:8px">Total window · ${formatTokens(total)}</div>
+          </div>`
+        );
+      }
+      if (historyPoints) {
+        parts.push(renderPromptCompositionBars(historyPoints));
+      }
+      return parts.join("");
+    }
+
+    function renderRecentChatsComposition(chats, limit = 2) {
+      const recent = [...chats]
+        .sort((a, b) => new Date(b.lastActive) - new Date(a.lastActive))
+        .slice(0, limit)
+        .filter((chat) => contextBudgetTotal(chat.contextBudget || emptyContextBudget()) > 0);
+      if (!recent.length) return "";
+      const blocks = recent
+        .map((chat) => {
+          const budget = chat.contextBudget || emptyContextBudget();
+          const total = contextBudgetTotal(budget);
+          return `<div class="chat-composition-block">
+              <div class="chat-composition-head">
+                <span class="chat-composition-title" title="${escapeHtml(chat.title)}">${escapeHtml(chat.title)}</span>
+                <span class="chat-composition-total">${formatTokens(total)} total</span>
+              </div>
+              ${renderContextBudgetMixBar(budget, { compactLegend: true })}
+            </div>`;
+        })
+        .join("");
+      return `
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+          <div class="card-label" style="margin-bottom:6px">Recent chats (last ${recent.length})</div>
+          <div class="card-sub" style="margin-bottom:10px">Each chat’s current window — colored bar matches the legend above.</div>
+          ${blocks}
+        </div>`;
+    }
+
+    function renderPromptCompositionBars(points) {
+      const bars = promptBarPoints(points);
+      if (!bars.length) {
+        return `<div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+          <div class="card-label" style="margin-bottom:6px">Last prompts</div>
+          <p class="card-sub">No sends recorded yet. With <code>npm start</code> running, each message you send in Cursor adds one bar here.</p>
+        </div>`;
+      }
+      const totals = bars.map(promptBarTotal);
+      const max = Math.max(...totals, 1);
+      const usedKeys = new Set();
+      const rows = bars
+        .map((point, index) => {
+          const total = totals[index];
+          const width = Math.max(1, (total / max) * 100);
+          let segments = "";
+          if (point.budget && total > 0) {
+            segments = CONTEXT_BUDGET_ROWS.map((row) => {
+              const tokens = point.budget[row.key] || 0;
+              if (!tokens) return "";
+              usedKeys.add(row.key);
+              const share = (tokens / total) * 100;
+              return `<span class="prompt-bar-seg" style="width:${share}%;background:${row.color}" title="${escapeHtml(row.label)}: ${tokens.toLocaleString()}"></span>`;
+            }).join("");
+          } else {
+            segments = `<span class="prompt-bar-seg" style="width:100%;background:var(--accent)" title="Window: ${total.toLocaleString()}"></span>`;
+          }
+          return `<div class="prompt-bar-row">
+            <span class="prompt-bar-label" title="${escapeHtml(point.ts || "")}">${escapeHtml(formatDateTime(point.ts))}</span>
+            <div class="prompt-bar-track"><div class="prompt-bar-fill" style="width:${width}%">${segments}</div></div>
+            <span class="prompt-bar-total">${formatTokens(total)}</span>
+          </div>`;
+        })
+        .join("");
+      const legend = CONTEXT_BUDGET_ROWS.filter((row) => usedKeys.has(row.key))
+        .map(
+          (row) =>
+            `<div class="tool-mix-item"><span class="budget-swatch" style="background:${row.color}"></span><strong>${escapeHtml(row.label)}</strong></div>`
+        )
+        .join("");
+      return `
+        <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border)">
+          <div class="card-label" style="margin-bottom:6px">Last ${bars.length} prompt${bars.length === 1 ? "" : "s"}</div>
+          <div class="card-sub" style="margin-bottom:8px">One bar per message you send, while this app is running. Length is the context window at send time. Colors match the mix above.</div>
+          <div class="prompt-bars">${rows}</div>
+          ${legend ? `<div class="prompt-legend">${legend}</div>` : ""}
+        </div>`;
     }
 
     function uniqueFiles(chats) {
@@ -1070,20 +1363,16 @@
       });
     }
 
-    function renderContextChart(series, height = 120, { mode = "percent" } = {}) {
+    function renderContextChart(series, height = 120, { mode = "percent", showAxes = false } = {}) {
       if (!series.length) return "";
       const width = 600;
-      const pad = { t: 8, r: 8, b: 20, l: 32 };
+      const pad = showAxes
+        ? { t: 14, r: 14, b: 36, l: 48 }
+        : { t: 8, r: 8, b: 20, l: 32 };
       const innerW = width - pad.l - pad.r;
       const innerH = height - pad.t - pad.b;
-      const yMax =
-        mode === "tokens"
-          ? Math.max(...series.map((p) => p.limitTokens || p.usedTokens || 1), 1)
-          : 100;
-      const chartSeries =
-        series.length === 1
-          ? [series[0], series[0]]
-          : series;
+      const yMax = chartYAxisMax(series, mode);
+      const chartSeries = series.length === 1 ? [series[0], series[0]] : series;
       const pts = chartSeries.map((p, i) => {
         const x = pad.l + (i / Math.max(1, chartSeries.length - 1)) * innerW;
         const value = mode === "tokens" ? p.usedTokens ?? 0 : p.percent ?? 0;
@@ -1099,8 +1388,37 @@
             `<line class="compress-marker" x1="${p.x}" y1="${pad.t}" x2="${p.x}" y2="${pad.t + innerH}" />`
         )
         .join("");
+
+      let axesSvg = "";
+      if (showAxes) {
+        const baseline = pad.t + innerH;
+        const yTicks = chartYTicks(yMax, mode);
+        const grid = yTicks
+          .map((tick) => {
+            const y = pad.t + innerH - (tick / yMax) * innerH;
+            return `<line class="chart-grid-line" x1="${pad.l}" y1="${y}" x2="${pad.l + innerW}" y2="${y}" />
+              <text class="chart-axis-label" x="${pad.l - 6}" y="${y + 3}" text-anchor="end">${escapeHtml(formatChartYTick(tick, mode))}</text>`;
+          })
+          .join("");
+        const withTs = series.filter((p) => p.ts);
+        const xStart = withTs[0]?.ts;
+        const xEnd = withTs[withTs.length - 1]?.ts;
+        const xStartLabel = xStart ? formatChartTimeLabel(xStart) : "Start";
+        const xEndLabel = xEnd ? formatChartTimeLabel(xEnd) : "Now";
+        const yTitle = mode === "tokens" ? "Tokens used" : "% used";
+        axesSvg = `
+          ${grid}
+          <line class="chart-axis-line" x1="${pad.l}" y1="${pad.t}" x2="${pad.l}" y2="${baseline}" />
+          <line class="chart-axis-line" x1="${pad.l}" y1="${baseline}" x2="${pad.l + innerW}" y2="${baseline}" />
+          <text class="chart-axis-title" x="${pad.l + innerW / 2}" y="${height - 6}" text-anchor="middle">Time</text>
+          <text class="chart-axis-label" x="${pad.l}" y="${baseline + 14}" text-anchor="start">${escapeHtml(xStartLabel)}</text>
+          <text class="chart-axis-label" x="${pad.l + innerW}" y="${baseline + 14}" text-anchor="end">${escapeHtml(xEndLabel)}</text>
+          <text class="chart-axis-title" transform="rotate(-90)" x="${-(pad.t + innerH / 2)}" y="12" text-anchor="middle">${escapeHtml(yTitle)}</text>`;
+      }
+
       return `
         <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+          ${axesSvg}
           <path class="chart-area" d="${areaD}" />
           <path class="chart-line" d="${lineD}" />
           ${compressLines}
@@ -1251,10 +1569,12 @@
         <section class="section">
           <h2 class="section-title">Context composition</h2>
           <div class="panel">
-            ${renderContextBudgetTable(
-              agg.contextBudget,
-              "Summed across chats. Chats with Cursor composer data use live token breakdown; others use transcript estimates."
-            )}
+            ${renderContextCompositionPanel({
+              budget: agg.contextBudget,
+              subtitle:
+                "Summed across chats. Chats with Cursor composer data use live token breakdown; others use transcript estimates.",
+            })}
+            ${renderRecentChatsComposition(repo.chats, 2)}
           </div>
         </section>
 
@@ -1356,7 +1676,8 @@
       const toolCalls = countToolCalls(chat.tools);
       const toolFails = countToolFailures(chat.tools);
       const main = document.getElementById("main");
-      const modelLabel = chat.models.length > 1 ? chat.models.join(" → ") : chat.models[0] || "—";
+      const modelsShown = modelsForChat(chat, state.contextHistoryPoints);
+      const modelLabel = modelsShown.length > 1 ? modelsShown.join(" → ") : modelsShown[0] || "—";
 
       main.innerHTML = `
         ${renderDataBanner()}
@@ -1382,6 +1703,9 @@
           <div class="card"><div class="card-label">Files touched</div><div class="card-value">${chat.files.length}</div><div class="card-sub">Created, edited, or deleted</div>${cardSourceSub(chat, "files")}</div>
           <div class="card"><div class="card-label">Output size</div><div class="card-value">${formatChars(chat.assistantChars)}</div><div class="card-sub">${chat.assistantChars.toLocaleString()} assistant chars</div>${cardSourceSub(chat, "assistantChars")}</div>
           <div class="card"><div class="card-label">Turns</div><div class="card-value">${chat.userTurns + chat.assistantTurns}</div><div class="card-sub">${turnsCardSub(chat)}</div></div>
+          ${modelsShown.length
+            ? `<div class="card"><div class="card-label">Models used</div><div class="card-value models-list" style="font-size:14px;font-weight:500">${escapeHtml(modelsShown.join(" → "))}</div><div class="card-sub">${modelsShown.length > 1 ? "Oldest → newest (transcript + each send via hook)" : "Current composer; more appear after sends with the hook"}</div></div>`
+            : ""}
         </div>
 
         <section class="section">
@@ -1411,13 +1735,13 @@
             </div>
             ${
               state.contextHistoryPoints.length >= 2
-                ? `<div class="chart-wrap">${renderContextChart(
+                ? `<div class="chart-wrap chart-wrap-ledger">${renderContextChart(
                     historyToChartSeries(state.contextHistoryPoints, state.historyYMode),
-                    140,
-                    { mode: state.historyYMode }
+                    168,
+                    { mode: state.historyYMode, showAxes: true }
                   )}</div>
-                  <div class="card-sub" style="margin-top:8px">Dashed vertical marks = inferred summarization between samples. Discovery every 10m adds warm chats (≤1h idle). Stored under <code>~/.context-ledger/history/</code>.</div>`
-                : `<p class="card-sub">Need at least 2 samples. Keep this server running while the chat is active in Cursor (updated within the last hour).</p>`
+                  <div class="card-sub" style="margin-top:8px">Each send adds a point while this app is running. The 15s watcher still samples up to 5 warm chats. Dashed marks are inferred summarization. Stored under <code>~/.context-ledger/history/</code>.</div>`
+                : `<p class="card-sub">Need at least 2 samples. Send a prompt in this chat while Context Ledger is running, or keep a warm chat open for the 15s watcher.</p>`
             }
           </div>
         </section>
@@ -1425,10 +1749,11 @@
         <section class="section">
           <h2 class="section-title">Context composition</h2>
           <div class="panel">
-            ${renderContextBudgetTable(
-              chat.contextBudget || emptyContextBudget(),
-              contextCompositionNote(chat)
-            )}
+            ${renderContextCompositionPanel({
+              budget: chat.contextBudget || emptyContextBudget(),
+              subtitle: contextCompositionNote(chat),
+              historyPoints: state.contextHistoryPoints,
+            })}
           </div>
         </section>
 

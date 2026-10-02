@@ -4,6 +4,7 @@ import path from "node:path";
 import { buildRepositories } from "./discover.js";
 import { computeHistoryStats, readContextHistory } from "./context-history.js";
 import { getWatchStatus, startContextWatchManager } from "./context-watch.js";
+import { handlePromptPing } from "./prompt-sample.js";
 import { ROOT_DIR } from "./paths.js";
 
 const PORT = Number(process.env.PORT || 3847);
@@ -45,6 +46,10 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, getWatchStatus());
   }
 
+  if (req.method === "POST" && url.pathname === "/api/prompt-ping") {
+    return handlePromptPing(req, res);
+  }
+
   const historyMatch = url.pathname.match(/^\/api\/history\/([0-9a-f-]{36})$/i);
   if (historyMatch) {
     const points = readContextHistory(historyMatch[1]);
@@ -72,7 +77,11 @@ const server = http.createServer((req, res) => {
     ".js": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
   };
-  res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+  const headers = { "Content-Type": types[ext] || "application/octet-stream" };
+  if (ext === ".html") {
+    headers["Cache-Control"] = "no-store";
+  }
+  res.writeHead(200, headers);
   fs.createReadStream(filePath).pipe(res);
 });
 

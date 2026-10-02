@@ -37,7 +37,7 @@ function runSampleTick() {
 
     const prev = lastSamples.get(composerId);
     const event = detectSummarizationEvent(prev, snap);
-    appendContextSample(composerId, { ...snap, event });
+    appendContextSample(composerId, { ...snap, event, trigger: "poll" });
     lastSamples.set(composerId, snap);
     stillActive.push(composerId);
   }

@@ -31,6 +31,15 @@ function getGlobalDb() {
   return db;
 }
 
+function resetGlobalDb() {
+  try {
+    db?.close();
+  } catch {
+    /* connection already unusable */
+  }
+  db = null;
+}
+
 function parseJsonValue(raw) {
   if (raw == null) return null;
   const text = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
@@ -168,6 +177,19 @@ export function listWarmComposers({ withinMs = 60 * 60 * 1000, limit = 5 } = {})
 /** Lightweight snapshot for context history polling. */
 export function sampleComposerContext(composerId) {
   try {
+    return readComposerSnapshot(composerId);
+  } catch {
+    // immutable=1 connections go stale when Cursor writes state.vscdb.
+    resetGlobalDb();
+    try {
+      return readComposerSnapshot(composerId);
+    } catch {
+      return null;
+    }
+  }
+}
+
+function readComposerSnapshot(composerId) {
     const database = getGlobalDb();
     const headerRow = database
       .prepare("SELECT value FROM composerHeaders WHERE composerId = ?")
@@ -210,10 +232,8 @@ export function sampleComposerContext(composerId) {
       limitTokens,
       summarizedTokens: budget.summarizedConversation,
       conversationTokens: budget.conversation,
+      budget,
     };
-  } catch {
-    return null;
-  }
 }
 
 export function loadComposerTelemetry(composerId, { workspacePath } = {}) {
@@ -361,6 +381,20 @@ function mergeContextSeries(transcriptSeries, telemetry) {
   return series;
 }
 
+export function mergeModelLists(...lists) {
+  const out = [];
+  for (const list of lists) {
+    for (const raw of list || []) {
+      const name = typeof raw === "string" ? raw.trim() : "";
+      if (!name) continue;
+      if (!out.some((existing) => existing.toLowerCase() === name.toLowerCase())) {
+        out.push(name);
+      }
+    }
+  }
+  return out;
+}
+
 export function applyComposerTelemetry(chat, telemetry) {
   if (!telemetry) return chat;
 
@@ -397,7 +431,7 @@ export function applyComposerTelemetry(chat, telemetry) {
     lastActive: telemetry.lastActive || chat.lastActive,
     activeSeconds: telemetry.sessionSeconds ?? chat.activeSeconds,
     userTurns: telemetry.userTurns ?? chat.userTurns,
-    models: telemetry.models?.length ? telemetry.models : chat.models,
+    models: mergeModelLists(chat.models, telemetry.models),
     agents,
     files,
     contextBudget: telemetry.contextBudget || chat.contextBudget,
