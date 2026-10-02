@@ -219,6 +219,38 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .main-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .btn-download-report {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      color: #e8e8e8;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn-download-report:hover:not(:disabled) {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-download-report:disabled {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
     .main-title {
       font-size: 20px;
       font-weight: 600;
@@ -252,6 +284,16 @@
     .badge.active { background: rgba(78, 201, 176, 0.2); color: var(--status-active); }
     .badge.completed { background: rgba(133, 133, 133, 0.25); color: #b0b0b0; }
     .badge.abandoned { background: rgba(244, 135, 113, 0.2); color: var(--status-abandoned); }
+
+    .badge.subagent-success { background: rgba(78, 201, 176, 0.2); color: var(--status-active); }
+    .badge.subagent-running { background: rgba(55, 148, 255, 0.2); color: var(--accent); }
+    .badge.subagent-aborted { background: rgba(220, 220, 170, 0.2); color: var(--warning); }
+    .badge.subagent-failed { background: rgba(244, 135, 113, 0.25); color: var(--danger); }
+    .badge.subagent-unknown { background: rgba(133, 133, 133, 0.2); color: #b0b0b0; }
+
+    tr.subagent-row-issue td {
+      background: rgba(244, 135, 113, 0.06);
+    }
 
     .highlights {
       display: flex;
@@ -636,6 +678,93 @@
       color: #e8e8e8;
       border-top: 1px solid var(--border);
       border-bottom: none;
+    }
+
+    .pdf-export-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100000;
+      background: rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      overflow: auto;
+      padding: 24px 16px 48px;
+    }
+
+    .pdf-export-status {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100001;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: #fff;
+      color: #222;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Light report theme — html2canvas paints reliably on white */
+    .pdf-export-root {
+      position: relative;
+      width: 760px;
+      max-width: 100%;
+      background: #ffffff !important;
+      color: #1a1a1a !important;
+      padding: 20px 24px 32px;
+      font-family: var(--font);
+      font-size: 13px;
+      box-shadow: 0 8px 40px rgba(0, 0, 0, 0.25);
+    }
+
+    .pdf-export-root .main {
+      background: #ffffff !important;
+      padding: 0 !important;
+      overflow: visible !important;
+      height: auto !important;
+      max-height: none !important;
+    }
+
+    .pdf-export-root .main-title,
+    .pdf-export-root .card-value,
+    .pdf-export-root .section-title,
+    .pdf-export-root .tool-mix-item strong,
+    .pdf-export-root table.data-table td {
+      color: #1a1a1a !important;
+    }
+
+    .pdf-export-root .card {
+      background: #f5f5f5 !important;
+      border-color: #dddddd !important;
+    }
+
+    .pdf-export-root .panel {
+      background: #fafafa !important;
+      border-color: #dddddd !important;
+    }
+
+    .pdf-export-root .card-label,
+    .pdf-export-root .card-sub,
+    .pdf-export-root .main-meta,
+    .pdf-export-root .tool-mix-item,
+    .pdf-export-root .bar-label,
+    .pdf-export-root .data-banner {
+      color: #555555 !important;
+    }
+
+    .pdf-export-root .main-header {
+      border-bottom-color: #dddddd !important;
+    }
+
+    .pdf-export-root .bar-track {
+      background: #e8e8e8 !important;
+    }
+
+    .pdf-export-root svg {
+      filter: none;
     }
   </style>
 </head>
@@ -1465,6 +1594,36 @@
       return chat.subAgents.length;
     }
 
+    function subagentStatusLabel(status) {
+      const labels = {
+        success: "Success",
+        aborted: "Aborted",
+        failed: "Failed",
+        running: "Running",
+        unknown: "Unknown",
+      };
+      return labels[status] || status || "Unknown";
+    }
+
+    function subagentStatusBadgeClass(status) {
+      const s = status || "unknown";
+      if (s === "success") return "subagent-success";
+      if (s === "running") return "subagent-running";
+      if (s === "aborted") return "subagent-aborted";
+      if (s === "failed") return "subagent-failed";
+      return "subagent-unknown";
+    }
+
+    function subagentRowClass(status) {
+      return status === "aborted" || status === "failed" ? "subagent-row-issue" : "";
+    }
+
+    function renderSubagentStatusCell(sa) {
+      const status = sa.status || "unknown";
+      const title = sa.rawStatus && sa.rawStatus !== status ? `Cursor: ${sa.rawStatus}` : "";
+      return `<span class="badge ${subagentStatusBadgeClass(status)}"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(subagentStatusLabel(status))}</span>`;
+    }
+
     function contextSectionTitle(chat) {
       return usesCursorContext(chat) ? "Context (from Cursor)" : "Context (estimated)";
     }
@@ -1479,7 +1638,7 @@
     function renderComposerContextHint(chat) {
       if (usesCursorContext(chat)) return "";
       const est = contextMetrics(chat.contextSeries || []).latest;
-      return `<div class="data-banner" style="margin-bottom:12px"><strong>Transcript estimate only</strong> — showing ~${est}% context from JSONL. Cursor’s live window (often much higher) needs composer data for this chat id. Hard-refresh after <code>npm start</code>, or use <button type="button" class="more-btn" id="refresh-data-inline">Refresh data</button>.</div>`;
+      return `<div class="data-banner" style="margin-bottom:12px"><strong>Transcript estimate only</strong> — showing ~${est}% context from JSONL. Cursor’s live window (often much higher) needs composer data for this chat id. Hard-refresh after <code>npm start</code>, or use <button type="button" class="more-btn report-exclude" id="refresh-data-inline">Refresh data</button>.</div>`;
     }
 
     function compressionChartNote(chat) {
@@ -1501,9 +1660,129 @@
       return "No context compressions detected in this transcript. <code>[REDACTED]</code> lines are export privacy redaction, not window compression.";
     }
 
-    function renderDataBanner() {
+    function renderDataBanner(opts = {}) {
       if (!DATA_META.chatSource) return "";
-      return `<div class="data-banner"><strong>Live data</strong> — ${DATA_META.chatCount || 0} agent transcripts across ${DATA_META.repositoryCount || 0} workspaces. Context table &amp; % use <strong>Cursor composer state</strong> when available (read-only); otherwise estimated from the transcript.</div>`;
+      const reportCls = opts.reportExclude ? " report-exclude" : "";
+      return `<div class="data-banner${reportCls}"><strong>Live data</strong> — ${DATA_META.chatCount || 0} agent transcripts across ${DATA_META.repositoryCount || 0} workspaces. Context table &amp; % use <strong>Cursor composer state</strong> when available (read-only); otherwise estimated from the transcript.</div>`;
+    }
+
+    let html2PdfLoadPromise = null;
+
+    function loadHtml2Pdf() {
+      if (window.html2pdf) return Promise.resolve(window.html2pdf);
+      if (!html2PdfLoadPromise) {
+        html2PdfLoadPromise = new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src =
+            "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.2/dist/html2pdf.bundle.min.js";
+          script.async = true;
+          script.onload = () =>
+            window.html2pdf ? resolve(window.html2pdf) : reject(new Error("html2pdf failed to load"));
+          script.onerror = () => reject(new Error("Could not load PDF library (check network)"));
+          document.head.appendChild(script);
+        });
+      }
+      return html2PdfLoadPromise;
+    }
+
+    function pdfSafeFilename(repo, chat) {
+      const slug = String(chat.title || "chat")
+        .replace(/[^\w\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "-")
+        .slice(0, 48) || "chat";
+      const repoSlug = String(repo.name || "repo")
+        .replace(/[^\w\s-]/g, "")
+        .trim()
+        .replace(/\s+/g, "-")
+        .slice(0, 32) || "repo";
+      return `context-ledger-${repoSlug}-${slug}.pdf`;
+    }
+
+    async function downloadChatReportPdf(repo, chat) {
+      const btn = document.getElementById("download-chat-report");
+      const prevLabel = btn?.textContent;
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Generating…";
+      }
+      let overlay;
+      let wrap;
+      try {
+        const html2pdf = await loadHtml2Pdf();
+        const main = document.getElementById("main");
+        const clone = main.cloneNode(true);
+        clone.querySelectorAll(".report-exclude").forEach((el) => el.remove());
+        clone.querySelectorAll("button").forEach((el) => el.remove());
+        clone.removeAttribute("id");
+        clone.style.flex = "none";
+        clone.style.overflow = "visible";
+        clone.style.height = "auto";
+        clone.style.maxHeight = "none";
+
+        overlay = document.createElement("div");
+        overlay.className = "pdf-export-overlay";
+        overlay.setAttribute("aria-hidden", "true");
+        const status = document.createElement("div");
+        status.className = "pdf-export-status";
+        status.textContent = "Generating PDF…";
+        overlay.appendChild(status);
+
+        wrap = document.createElement("div");
+        wrap.className = "pdf-export-root";
+        const cover = document.createElement("div");
+        cover.style.cssText = "margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #dddddd;";
+        cover.innerHTML = `<div style="font-size:11px;color:#555555;line-height:1.5">${escapeHtml(APP_BRAND.name)} · Chat report<br>${escapeHtml(repo.name)} · ${escapeHtml(chat.title)}<br>Generated ${escapeHtml(new Date().toLocaleString())}</div>`;
+        wrap.appendChild(cover);
+        wrap.appendChild(clone);
+        overlay.appendChild(wrap);
+        document.body.appendChild(overlay);
+
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        const exportHeight = Math.max(wrap.scrollHeight, wrap.offsetHeight, 400);
+        const scale = Math.min(2, Math.max(1, 4096 / exportHeight));
+
+        const pdfOpts = {
+          margin: [8, 8, 10, 8],
+          filename: pdfSafeFilename(repo, chat),
+          image: { type: "png", quality: 1 },
+          html2canvas: {
+            scale,
+            backgroundColor: "#ffffff",
+            logging: false,
+            useCORS: true,
+            scrollX: 0,
+            scrollY: -window.scrollY,
+            onclone: (clonedDoc) => {
+              clonedDoc.documentElement.style.colorScheme = "light";
+              const root = clonedDoc.querySelector(".pdf-export-root");
+              if (!root) return;
+              root.style.background = "#ffffff";
+              root.style.color = "#1a1a1a";
+              const mainClone = root.querySelector(".main");
+              if (mainClone) {
+                mainClone.style.overflow = "visible";
+                mainClone.style.height = "auto";
+                mainClone.style.maxHeight = "none";
+                mainClone.style.background = "#ffffff";
+              }
+            },
+          },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        };
+
+        await html2pdf().set(pdfOpts).from(wrap).save();
+      } catch (err) {
+        alert(`Could not create PDF: ${err.message}`);
+      } finally {
+        overlay?.remove();
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = prevLabel || "Download PDF";
+        }
+      }
     }
 
     function renderRepoOverview(repo) {
@@ -1624,15 +1903,16 @@
           <div class="panel">
             ${agg.subAgentEntries.length
               ? `<table class="data-table">
-              <thead><tr><th>Type</th><th>Heading</th><th>Chat</th></tr></thead>
+              <thead><tr><th>Type</th><th>Heading</th><th>Chat</th><th>Status</th></tr></thead>
               <tbody>
                 ${agg.subAgentEntries
                   .map(
                     (sa) => `
-                  <tr>
+                  <tr class="${subagentRowClass(sa.status)}">
                     <td>${escapeHtml(sa.type)}</td>
                     <td>${escapeHtml(sa.heading)}</td>
                     <td><button type="button" class="highlight-chip" style="padding:4px 8px;margin:0" data-goto-chat="${sa.chatId}">${escapeHtml(sa.chatTitle)}</button></td>
+                    <td>${renderSubagentStatusCell(sa)}</td>
                   </tr>`
                   )
                   .join("")}
@@ -1680,10 +1960,13 @@
       const modelLabel = modelsShown.length > 1 ? modelsShown.join(" → ") : modelsShown[0] || "—";
 
       main.innerHTML = `
-        ${renderDataBanner()}
+        ${renderDataBanner({ reportExclude: true })}
         ${renderComposerContextHint(chat)}
         <header class="main-header">
-          <h1 class="main-title">${escapeHtml(chat.title)}</h1>
+          <div class="main-header-top">
+            <h1 class="main-title">${escapeHtml(chat.title)}</h1>
+            <button type="button" class="btn-download-report report-exclude" id="download-chat-report" title="Download this chat dashboard as PDF (main panel only)">Download PDF</button>
+          </div>
           <div class="main-meta">
             <span class="badge ${chat.status}">${chat.status}</span>
             <span>Started ${formatDateTime(chat.started)}</span>
@@ -1729,7 +2012,7 @@
               <span>Samples <strong>${state.contextHistoryPoints.length}</strong></span>
               <span>Peak seen <strong>${historyPeakLabel(state.contextHistoryPoints, state.historyYMode)}</strong></span>
             </div>
-            <div style="display:flex;gap:8px;margin-bottom:10px">
+            <div class="report-exclude" style="display:flex;gap:8px;margin-bottom:10px">
               <button type="button" class="more-btn history-y-toggle ${state.historyYMode === "percent" ? "active-toggle" : ""}" data-y-mode="percent">% used</button>
               <button type="button" class="more-btn history-y-toggle ${state.historyYMode === "tokens" ? "active-toggle" : ""}" data-y-mode="tokens">Tokens used</button>
             </div>
@@ -1804,11 +2087,12 @@
           <div class="panel">
             ${chat.subAgents.length
               ? `<table class="data-table">
-              <thead><tr><th>Type</th><th>Heading</th></tr></thead>
+              <thead><tr><th>Type</th><th>Heading</th><th>Status</th></tr></thead>
               <tbody>
                 ${chat.subAgents
                   .map(
-                    (sa) => `<tr><td>${escapeHtml(sa.type)}</td><td>${escapeHtml(sa.heading)}</td></tr>`
+                    (sa) =>
+                      `<tr class="${subagentRowClass(sa.status)}"><td>${escapeHtml(sa.type)}</td><td>${escapeHtml(sa.heading)}</td><td>${renderSubagentStatusCell(sa)}</td></tr>`
                   )
                   .join("")}
               </tbody>
@@ -1897,6 +2181,13 @@
       if (yBtn?.dataset.yMode) {
         state.historyYMode = yBtn.dataset.yMode;
         render();
+        return;
+      }
+      if (e.target.id === "download-chat-report") {
+        e.preventDefault();
+        const repo = getRepo(state.selectedRepoId);
+        const chat = repo && state.selectedChatId ? getChat(repo, state.selectedChatId) : null;
+        if (repo && chat) downloadChatReportPdf(repo, chat);
         return;
       }
       if (e.target.id !== "refresh-data-inline") return;

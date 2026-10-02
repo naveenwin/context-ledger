@@ -8,7 +8,12 @@ import {
   repoIdFromKey,
 } from "./decode-slug.js";
 import { parseTranscript } from "./parse-transcript.js";
-import { applyComposerTelemetry, loadComposerTelemetry } from "./cursor-composer.js";
+import {
+  applyComposerTelemetry,
+  loadComposerTelemetry,
+  loadSubagentRuns,
+} from "./cursor-composer.js";
+import { mergeSubagentStatuses } from "./subagent-status.js";
 import {
   cursorProjectsDir,
   pathExists,
@@ -108,10 +113,31 @@ export function buildRepositories() {
 
     for (const { chatId, jsonlPath } of transcriptFiles) {
       if (repo.chats.some((c) => c.id === chatId)) continue;
-      const parsed = parseTranscript(jsonlPath, {
+      let parsed = parseTranscript(jsonlPath, {
         chatId,
         workspacePath: ws.folderPath,
       });
+      if (parsed.subAgents?.length) {
+        const runs = loadSubagentRuns(chatId);
+        const subAgents = runs.length
+          ? mergeSubagentStatuses(parsed.subAgents, runs)
+          : parsed.subAgents.map((sa) => ({
+              ...sa,
+              status: "unknown",
+              statusSource: "transcript",
+            }));
+        parsed = {
+          ...parsed,
+          subAgents,
+          meta: {
+            ...parsed.meta,
+            fieldSources: {
+              ...(parsed.meta?.fieldSources || {}),
+              ...(runs.length ? { subAgentStatus: "cursor-composer" } : {}),
+            },
+          },
+        };
+      }
       const telemetry = loadComposerTelemetry(chatId, {
         workspacePath: ws.folderPath,
       });

@@ -15,7 +15,8 @@ Agent chats are opaque: context fills up, tools pile on, sub-agents spawn, and i
 ## Key features
 
 - **Repo & chat sidebar** — workspaces under `~/.cursor/projects/`, chats from agent transcript JSONL
-- **Per-chat dashboard** — duration, turns, tool calls, files touched, assistant output size, sub-agents
+- **Per-chat dashboard** — duration, turns, tool calls, files touched, assistant output size, sub-agents with per-run status (success / running / aborted / failed)
+- **Chat PDF report** — **Download PDF** on the chat view exports the main panel only (no sidebar) as a shareable light-theme report
 - **Context window** — current % and token breakdown when composer id matches Cursor global storage; estimates from transcript otherwise
 - **Context composition** — horizontal bars per bucket (system, tools, rules, skills, MCP, conversation, summarized), whole-window mix strip, last prompt samples from the hook
 - **Context memory chart** — time series from `~/.context-ledger/history/` (15s watcher + prompt-hook points), axes, inferred summarization markers
@@ -34,7 +35,8 @@ Agent chats are opaque: context fills up, tools pile on, sub-agents spawn, and i
 | Context memory (ledger) chart | % or tokens over time | **Ledger** (`~/.context-ledger/history/<id>.jsonl`) | Written only by this app while `npm start` runs |
 | Last N prompt bars | Window at each send | **Ledger** (`trigger: user_prompt`) | Requires hook → `POST /api/prompt-ping` |
 | Models used | Model id chain | **Transcript** + **Ledger** (hook) | Hook adds a model per send going forward |
-| Sub-agents | Task / cursor.Task spawns | **Transcript** | |
+| Sub-agents | Task spawns + per-run status | **Transcript** + **Composer** (child composer `status` when linked) | Status column on the right; aborted/failed rows highlighted; unknown if composer data missing |
+| Download PDF | Chat dashboard snapshot | **Browser** (client-side) | Chat view only; loads [html2pdf.js](https://github.com/eKoopmans/html2pdf.js) from CDN on first use; brief on-screen preview while generating |
 
 **Transcript** = durable agent log Cursor already wrote. **Composer** = read-only SQLite state Cursor uses for the IDE context meter. **Ledger** = optional local history this project writes under `~/.context-ledger/`.
 
@@ -137,6 +139,7 @@ Replace `/path/to/context-ledger` with your clone location. The script POSTs to 
 - **Model history** — full per-send model chain needs the prompt hook; older sessions may only show transcript model metadata.
 - **Watch cap** — at most five warm chats sampled every 15s; not a full audit log of every session.
 - **No auth** — intended for single-user local use.
+- **PDF export** — rasterized pages (not selectable text); first download needs network for the html2pdf CDN script; very long chats produce large files.
 
 ## Contributing
 

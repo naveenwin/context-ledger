@@ -1,2 +1,5 @@
 node_modules/
 .temp/
+.DS_Store
+.tmp-pdf-test.pdf
+.playwright-mcp/

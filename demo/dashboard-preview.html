@@ -125,6 +125,11 @@
       text-transform: capitalize;
     }
     .badge.active { background: rgba(78, 201, 176, 0.2); color: var(--status-active); }
+    .badge.subagent-success { background: rgba(78, 201, 176, 0.2); color: var(--status-active); }
+    .badge.subagent-running { background: rgba(55, 148, 255, 0.2); color: var(--accent); }
+    .badge.subagent-aborted { background: rgba(220, 220, 170, 0.2); color: var(--warning); }
+    .badge.subagent-failed { background: rgba(244, 135, 113, 0.25); color: var(--danger); }
+    tr.subagent-row-issue td { background: rgba(244, 135, 113, 0.06); }
     .cards {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -685,11 +690,11 @@
         <h2 class="section-title">Sub-agents (3)</h2>
         <div class="panel">
           <table class="data-table">
-            <thead><tr><th>Type</th><th>Heading</th></tr></thead>
+            <thead><tr><th>Type</th><th>Heading</th><th>Status</th></tr></thead>
             <tbody>
-              <tr><td>explore</td><td>Find JWT middleware usage across services</td></tr>
-              <tr><td>generalPurpose</td><td>Spike refresh token rotation design</td></tr>
-              <tr><td>explore</td><td>Map rate-limit config in gateway</td></tr>
+              <tr><td>explore</td><td>Find JWT middleware usage across services</td><td><span class="badge subagent-success">Success</span></td></tr>
+              <tr class="subagent-row-issue"><td>generalPurpose</td><td>Spike refresh token rotation design</td><td><span class="badge subagent-aborted">Aborted</span></td></tr>
+              <tr><td>explore</td><td>Map rate-limit config in gateway</td><td><span class="badge subagent-running">Running</span></td></tr>
             </tbody>
           </table>
         </div>

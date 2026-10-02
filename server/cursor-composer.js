@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSqliteReadOnlyUri } from "./read-only.js";
 import { CURSOR_APP_SUPPORT } from "./paths.js";
+import { mapSubagentRunStatus } from "./subagent-status.js";
 
 const CATEGORY_TO_BUDGET_KEY = {
   system_prompt: "systemPrompts",
@@ -379,6 +380,64 @@ function mergeContextSeries(transcriptSeries, telemetry) {
   const last = series[series.length - 1];
   series[series.length - 1] = { ...last, percent: pct };
   return series;
+}
+
+function findSubagentChildIds(parentComposerId) {
+  const database = getGlobalDb();
+  const pattern = `%"parentComposerId":"${parentComposerId}"%`;
+  const rows = database
+    .prepare(
+      `SELECT key FROM cursorDiskKV WHERE key LIKE 'composerData:%' AND CAST(value AS TEXT) LIKE ?`
+    )
+    .all(pattern);
+  return rows.map((r) => String(r.key).replace(/^composerData:/, ""));
+}
+
+/** Sub-agent runs for a parent chat/composer id (read-only Cursor global storage). */
+export function loadSubagentRuns(parentComposerId) {
+  if (!parentComposerId) return [];
+  try {
+    const database = getGlobalDb();
+    const dataRow = database
+      .prepare("SELECT value FROM cursorDiskKV WHERE key = ?")
+      .get(`composerData:${parentComposerId}`);
+    const parent = dataRow?.value ? parseJsonValue(dataRow.value) : null;
+    let ids = Array.isArray(parent?.subagentComposerIds)
+      ? [...parent.subagentComposerIds]
+      : [];
+    if (!ids.length) {
+      ids = findSubagentChildIds(parentComposerId);
+    }
+
+    const runs = [];
+    for (const childId of ids) {
+      const childRow = database
+        .prepare("SELECT value FROM cursorDiskKV WHERE key = ?")
+        .get(`composerData:${childId}`);
+      if (!childRow?.value) continue;
+      const composer = parseJsonValue(childRow.value);
+      if (!composer?.subagentInfo) continue;
+
+      const headerRow = database
+        .prepare("SELECT value FROM composerHeaders WHERE composerId = ?")
+        .get(childId);
+      const header = headerRow?.value ? parseJsonValue(headerRow.value) : null;
+      const rawStatus = composer.status ?? header?.status ?? null;
+
+      runs.push({
+        composerId: childId,
+        name: header?.name || composer.name || null,
+        type: composer.subagentInfo?.subagentTypeName || null,
+        rawStatus,
+        status: mapSubagentRunStatus(rawStatus),
+        createdAt: header?.createdAt ?? composer.createdAt ?? null,
+      });
+    }
+    return runs;
+  } catch {
+    resetGlobalDb();
+    return [];
+  }
 }
 
 export function mergeModelLists(...lists) {
