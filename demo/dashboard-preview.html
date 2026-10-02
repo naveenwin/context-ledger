@@ -244,6 +244,76 @@
       margin-bottom: 10px;
     }
     .tool-mix-bar .seg { height: 100%; min-width: 2px; }
+    .tool-mix-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .tool-mix-item { display: inline-flex; align-items: center; gap: 6px; }
+    .tool-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+    .data-banner {
+      margin-bottom: 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(55, 148, 255, 0.35);
+      background: rgba(55, 148, 255, 0.08);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .data-banner strong { color: #e8e8e8; }
+    .more-btn {
+      font-size: 11px;
+      padding: 5px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-main);
+      color: var(--text-muted);
+      cursor: default;
+    }
+    .more-btn.active-toggle {
+      background: rgba(55, 148, 255, 0.25);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .context-gauge .bar-track { height: 14px; border-radius: 4px; }
+    .action-tag {
+      display: inline-block;
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      margin-right: 8px;
+      font-weight: 600;
+    }
+    .action-tag.created { background: rgba(78, 201, 176, 0.2); color: var(--success); }
+    .action-tag.edited { background: rgba(55, 148, 255, 0.2); color: var(--accent); }
+    .action-tag.deleted { background: rgba(244, 135, 113, 0.2); color: var(--danger); }
+    .file-path { font-family: var(--mono); font-size: 11px; word-break: break-all; }
+    .models-list { font-size: 14px; font-weight: 500; }
+    .prompt-bars { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+    .prompt-bar-row {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr) 52px;
+      gap: 8px;
+      align-items: center;
+      font-size: 11px;
+    }
+    .prompt-bar-label { color: var(--text-muted); }
+    .prompt-bar-track {
+      height: 10px;
+      background: var(--bg-main);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .prompt-bar-fill { display: flex; height: 100%; min-width: 2px; }
+    .prompt-bar-seg { height: 100%; }
+    .prompt-bar-total { text-align: right; color: var(--text-dim); font-size: 10px; }
+    .prompt-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px; font-size: 11px; color: var(--text-muted); }
+    .section-divider { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .card-label-sm { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 6px; }
   </style>
 </head>
 <body>
@@ -315,6 +385,10 @@
       </div>
     </aside>
     <main class="main">
+      <div class="data-banner">
+        <strong>Live data</strong> — demo only. Context table &amp; % use <strong>Cursor composer state</strong> when linked; tools/skills from agent transcript.
+      </div>
+
       <header class="main-header">
         <h1 class="main-title">Auth refactor</h1>
         <div class="main-meta">
@@ -322,6 +396,7 @@
           <span>Started Oct 2, 2026, 9:14 AM</span>
           <span>Last active 12m ago</span>
           <span>Model grok-4.7-high-fast → composer-2.5</span>
+          <span>Composer linked</span>
           <span style="color:var(--text-dim)">in acme-api</span>
         </div>
       </header>
@@ -330,12 +405,12 @@
         <div class="card">
           <div class="card-label">Active duration</div>
           <div class="card-value">47m</div>
-          <div class="card-sub">Transcript timestamps</div>
+          <div class="card-sub">Cursor session span</div>
         </div>
         <div class="card">
-          <div class="card-label">Ledger tokens</div>
+          <div class="card-label">Total tokens (chat)</div>
           <div class="card-value">118k</div>
-          <div class="card-sub">Peak from local history</div>
+          <div class="card-sub">Peak window while watched · 24 samples · high 78%</div>
         </div>
         <div class="card">
           <div class="card-label">Tool calls</div>
@@ -350,7 +425,7 @@
         <div class="card">
           <div class="card-label">Context now</div>
           <div class="card-value">72%</div>
-          <div class="card-sub">Current Cursor window · 1 compression</div>
+          <div class="card-sub">Current Cursor window · Summarized 18.2k</div>
         </div>
         <div class="card">
           <div class="card-label">Files touched</div>
@@ -365,33 +440,28 @@
         <div class="card">
           <div class="card-label">Turns</div>
           <div class="card-value">28</div>
-          <div class="card-sub">14 user · 14 assistant</div>
+          <div class="card-sub">14 user (composer) · 14 assistant (transcript)</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Models used</div>
+          <div class="card-value models-list">grok-4.7-high-fast → composer-2.5</div>
+          <div class="card-sub">Oldest → newest (transcript + each send via hook)</div>
         </div>
       </div>
 
       <section class="section">
-        <h2 class="section-title">Context (Cursor window)</h2>
+        <h2 class="section-title">Context (from Cursor)</h2>
         <div class="panel">
           <div class="context-stats">
             <span>Window <strong>72%</strong></span>
             <span>Summarized <strong>18.2k</strong></span>
             <span>Cursor <strong>72%</strong> · ~86k / 120k</span>
           </div>
-          <div class="chart-wrap" style="height:120px">
-            <svg viewBox="0 0 400 100" preserveAspectRatio="none">
-              <line class="chart-grid-line" x1="40" y1="20" x2="380" y2="20"/>
-              <line class="chart-grid-line" x1="40" y1="50" x2="380" y2="50"/>
-              <line class="chart-grid-line" x1="40" y1="80" x2="380" y2="80"/>
-              <line class="chart-axis-line" x1="40" y1="85" x2="380" y2="85"/>
-              <text class="chart-axis-label" x="4" y="24">100%</text>
-              <text class="chart-axis-label" x="12" y="54">50%</text>
-              <text class="chart-axis-label" x="18" y="84">0%</text>
-              <path class="chart-area" d="M40,75 L120,68 L200,55 L280,48 L360,38 L380,35 L380,85 L40,85 Z"/>
-              <path class="chart-line" d="M40,75 L120,68 L200,55 L280,48 L360,38 L380,35"/>
-              <line class="compress-marker" x1="200" y1="10" x2="200" y2="90"/>
-            </svg>
+          <div class="context-gauge" style="margin:12px 0">
+            <div class="bar-track"><div class="bar-fill" style="width:72%"></div></div>
+            <div class="card-sub" style="margin-top:6px">Current window <strong>72%</strong> (Cursor snapshot)</div>
           </div>
-          <div class="card-sub" style="margin-top:8px">Estimated from transcript when composer is not linked; dashed line = inferred compression.</div>
+          <div class="card-sub" style="margin-top:8px">Cursor only stores the current window. Local ledger chart below is built from samples while this app runs.</div>
         </div>
       </section>
 
@@ -402,6 +472,10 @@
             <span><span class="badge active">Watching · 15s samples</span></span>
             <span>Samples <strong>24</strong></span>
             <span>Peak seen <strong>78%</strong></span>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <span class="more-btn active-toggle">% used</span>
+            <span class="more-btn">Tokens used</span>
           </div>
           <div class="chart-wrap">
             <svg viewBox="0 0 400 140" preserveAspectRatio="none">
@@ -428,77 +502,106 @@
       <section class="section">
         <h2 class="section-title">Context composition</h2>
         <div class="panel">
-          <p class="sub">Current prompt window (from Cursor <code>promptTokenBreakdown</code> when composer is linked).</p>
+          <p class="sub">Current prompt window only (matches Cursor’s Context Usage popover). System, tools, rules, skills, and MCP reflect what is attached now.</p>
           <div class="bar-row">
             <span class="bar-label"><span class="dot" style="background:#3794ff"></span>System prompts</span>
-            <div class="bar-track"><div class="bar-fill" style="width:6%;background:#3794ff"></div></div>
+            <div class="bar-track"><div class="bar-fill" style="width:8%;background:#3794ff"></div></div>
             <span class="bar-pct">1.7k</span>
           </div>
           <div class="bar-row">
             <span class="bar-label"><span class="dot" style="background:#4ec9b0"></span>Tool definitions</span>
-            <div class="bar-track"><div class="bar-fill" style="width:14%;background:#4ec9b0"></div></div>
+            <div class="bar-track"><div class="bar-fill" style="width:18%;background:#4ec9b0"></div></div>
             <span class="bar-pct">3.6k</span>
           </div>
           <div class="bar-row">
-            <span class="bar-label"><span class="dot" style="background:#dcdcaa"></span>Rules &amp; skills</span>
-            <div class="bar-track"><div class="bar-fill" style="width:4%;background:#dcdcaa"></div></div>
-            <span class="bar-pct">1.1k</span>
+            <span class="bar-label"><span class="dot" style="background:#dcdcaa"></span>Rules</span>
+            <div class="bar-track"><div class="bar-fill" style="width:12%;background:#dcdcaa"></div></div>
+            <span class="bar-pct">2.1k</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background:#c586c0"></span>Skills</span>
+            <div class="bar-track"><div class="bar-fill" style="width:14%;background:#c586c0"></div></div>
+            <span class="bar-pct">3.0k</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background:#f48771"></span>MCP &amp; dynamic tools</span>
+            <div class="bar-track"><div class="bar-fill" style="width:13%;background:#f48771"></div></div>
+            <span class="bar-pct">2.8k</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background:#ce9178"></span>Sub-agent</span>
+            <div class="bar-track"><div class="bar-fill" style="width:6%;background:#ce9178"></div></div>
+            <span class="bar-pct">1.2k</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background:#9cdcfe"></span>Summarized conversation</span>
+            <div class="bar-track"><div class="bar-fill" style="width:22%;background:#9cdcfe"></div></div>
+            <span class="bar-pct">18.2k</span>
           </div>
           <div class="bar-row">
             <span class="bar-label"><span class="dot" style="background:#b5cea8"></span>Conversation</span>
             <div class="bar-track"><div class="bar-fill" style="width:100%;background:#b5cea8"></div></div>
-            <span class="bar-pct">78.4k</span>
-          </div>
-          <p class="sub" style="margin-top:14px"><strong>Whole window</strong></p>
-          <div class="window-mix" aria-label="Window mix">
-            <div class="seg" style="width:2%;background:#3794ff"></div>
-            <div class="seg" style="width:4%;background:#4ec9b0"></div>
-            <div class="seg" style="width:3%;background:#dcdcaa"></div>
-            <div class="seg" style="width:91%;background:#b5cea8"></div>
-          </div>
-          <div class="legend">
-            <span><span class="dot" style="background:#b5cea8"></span>Conversation 91%</span>
-            <span><span class="dot" style="background:#4ec9b0"></span>Tools 4%</span>
-            <span><span class="dot" style="background:#3794ff"></span>System 2%</span>
+            <span class="bar-pct">60.2k</span>
           </div>
 
-          <div class="chat-composition-block">
-            <div class="chat-composition-head">
-              <span class="chat-composition-title">Last 3 prompts (hook samples)</span>
-              <span class="chat-composition-total">samples at send</span>
+          <div class="section-divider">
+            <div class="card-label-sm">Window mix</div>
+            <div class="window-mix" aria-label="Window mix">
+              <div class="seg" style="width:1.4%;background:#3794ff"></div>
+              <div class="seg" style="width:3%;background:#4ec9b0"></div>
+              <div class="seg" style="width:1.8%;background:#dcdcaa"></div>
+              <div class="seg" style="width:2.5%;background:#c586c0"></div>
+              <div class="seg" style="width:2.4%;background:#f48771"></div>
+              <div class="seg" style="width:1%;background:#ce9178"></div>
+              <div class="seg" style="width:15%;background:#9cdcfe"></div>
+              <div class="seg" style="width:72.9%;background:#b5cea8"></div>
             </div>
-            <div class="chat-composition-block" style="padding-top:8px;border:none">
-              <div class="chat-composition-head">
-                <span class="chat-composition-title">Send · Oct 2, 10:38</span>
-                <span class="chat-composition-total">86.2k</span>
+            <div class="tool-mix-legend">
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#b5cea8"></span><strong>Conversation</strong> 60.2k (51%)</span>
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#9cdcfe"></span><strong>Summarized</strong> 18.2k (15%)</span>
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#4ec9b0"></span><strong>Tools</strong> 3.6k</span>
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#c586c0"></span><strong>Skills</strong> 3.0k</span>
+            </div>
+            <div class="card-sub" style="margin-top:6px">Total window · 92.8k</div>
+          </div>
+
+          <div class="section-divider">
+            <div class="card-label-sm">Last 3 prompts</div>
+            <div class="sub" style="margin-bottom:8px">One bar per message you send while Context Ledger is running. Colors match the mix above.</div>
+            <div class="prompt-bars">
+              <div class="prompt-bar-row">
+                <span class="prompt-bar-label">Oct 2, 10:38</span>
+                <div class="prompt-bar-track"><div class="prompt-bar-fill" style="width:100%">
+                  <span class="prompt-bar-seg" style="width:2%;background:#3794ff"></span>
+                  <span class="prompt-bar-seg" style="width:4%;background:#4ec9b0"></span>
+                  <span class="prompt-bar-seg" style="width:15%;background:#9cdcfe"></span>
+                  <span class="prompt-bar-seg" style="width:79%;background:#b5cea8"></span>
+                </div></div>
+                <span class="prompt-bar-total">86.2k</span>
               </div>
-              <div class="window-mix">
-                <div class="seg" style="width:2%;background:#3794ff"></div>
-                <div class="seg" style="width:4%;background:#4ec9b0"></div>
-                <div class="seg" style="width:94%;background:#b5cea8"></div>
+              <div class="prompt-bar-row">
+                <span class="prompt-bar-label">Oct 2, 10:22</span>
+                <div class="prompt-bar-track"><div class="prompt-bar-fill" style="width:92%">
+                  <span class="prompt-bar-seg" style="width:2%;background:#3794ff"></span>
+                  <span class="prompt-bar-seg" style="width:5%;background:#4ec9b0"></span>
+                  <span class="prompt-bar-seg" style="width:93%;background:#b5cea8"></span>
+                </div></div>
+                <span class="prompt-bar-total">79.1k</span>
+              </div>
+              <div class="prompt-bar-row">
+                <span class="prompt-bar-label">Oct 2, 10:05</span>
+                <div class="prompt-bar-track"><div class="prompt-bar-fill" style="width:83%">
+                  <span class="prompt-bar-seg" style="width:3%;background:#3794ff"></span>
+                  <span class="prompt-bar-seg" style="width:5%;background:#4ec9b0"></span>
+                  <span class="prompt-bar-seg" style="width:92%;background:#b5cea8"></span>
+                </div></div>
+                <span class="prompt-bar-total">71.4k</span>
               </div>
             </div>
-            <div class="chat-composition-block">
-              <div class="chat-composition-head">
-                <span class="chat-composition-title">Send · Oct 2, 10:22</span>
-                <span class="chat-composition-total">79.1k</span>
-              </div>
-              <div class="window-mix">
-                <div class="seg" style="width:2%;background:#3794ff"></div>
-                <div class="seg" style="width:5%;background:#4ec9b0"></div>
-                <div class="seg" style="width:93%;background:#b5cea8"></div>
-              </div>
-            </div>
-            <div class="chat-composition-block">
-              <div class="chat-composition-head">
-                <span class="chat-composition-title">Send · Oct 2, 10:05</span>
-                <span class="chat-composition-total">71.4k</span>
-              </div>
-              <div class="window-mix">
-                <div class="seg" style="width:3%;background:#3794ff"></div>
-                <div class="seg" style="width:5%;background:#4ec9b0"></div>
-                <div class="seg" style="width:92%;background:#b5cea8"></div>
-              </div>
+            <div class="prompt-legend">
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#b5cea8"></span>Conversation</span>
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#9cdcfe"></span>Summarized</span>
+              <span class="tool-mix-item"><span class="tool-swatch" style="background:#4ec9b0"></span>Tool definitions</span>
             </div>
           </div>
         </div>
@@ -509,10 +612,18 @@
         <div class="panel">
           <div class="card-label" style="margin-bottom:10px">Tool mix</div>
           <div class="tool-mix-bar">
-            <div class="seg" style="width:42%;background:#3794ff"></div>
-            <div class="seg" style="width:28%;background:#4ec9b0"></div>
-            <div class="seg" style="width:18%;background:#c586c0"></div>
-            <div class="seg" style="width:12%;background:#dcdcaa"></div>
+            <div class="seg" style="width:28%;background:#3794ff"></div>
+            <div class="seg" style="width:26%;background:#4ec9b0"></div>
+            <div class="seg" style="width:21%;background:#c586c0"></div>
+            <div class="seg" style="width:14%;background:#dcdcaa"></div>
+            <div class="seg" style="width:11%;background:#f48771"></div>
+          </div>
+          <div class="tool-mix-legend">
+            <span class="tool-mix-item"><span class="tool-swatch" style="background:#3794ff"></span><strong>Grep</strong> 24</span>
+            <span class="tool-mix-item"><span class="tool-swatch" style="background:#4ec9b0"></span><strong>Read</strong> 22</span>
+            <span class="tool-mix-item"><span class="tool-swatch" style="background:#c586c0"></span><strong>Shell</strong> 18</span>
+            <span class="tool-mix-item"><span class="tool-swatch" style="background:#dcdcaa"></span><strong>StrReplace</strong> 12</span>
+            <span class="tool-mix-item"><span class="tool-swatch" style="background:#f48771"></span><strong>Task</strong> 10</span>
           </div>
           <table class="data-table">
             <thead>
@@ -523,8 +634,102 @@
               <tr><td>Read</td><td class="num">22</td><td class="ok">22</td><td class="fail">0</td></tr>
               <tr><td>Shell</td><td class="num">18</td><td class="ok">17</td><td class="fail">1</td></tr>
               <tr><td>StrReplace</td><td class="num">12</td><td class="ok">11</td><td class="fail">1</td></tr>
+              <tr><td>Task</td><td class="num">10</td><td class="ok">10</td><td class="fail">0</td></tr>
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Skills · Agents · Commands</h2>
+        <div class="panel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+          <div>
+            <div class="card-label" style="margin-bottom:8px">Skills</div>
+            <div class="card-sub" style="margin-bottom:8px">Invocation counts from transcript.</div>
+            <table class="data-table">
+              <thead><tr><th>Skill</th><th>Uses</th></tr></thead>
+              <tbody>
+                <tr><td>systematic-debugging</td><td class="num">4</td></tr>
+                <tr><td>test-driven-development</td><td class="num">3</td></tr>
+                <tr><td>brainstorming</td><td class="num">2</td></tr>
+                <tr><td>verification-before-completion</td><td class="num">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:8px">Agents</div>
+            <table class="data-table">
+              <thead><tr><th>Agent</th><th>Uses</th></tr></thead>
+              <tbody>
+                <tr><td>explore</td><td class="num">5</td></tr>
+                <tr><td>generalPurpose</td><td class="num">3</td></tr>
+                <tr><td>Agent</td><td class="num">8</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div>
+            <div class="card-label" style="margin-bottom:8px">Commands</div>
+            <table class="data-table">
+              <thead><tr><th>Command</th><th>Uses</th></tr></thead>
+              <tbody>
+                <tr><td>/review</td><td class="num">2</td></tr>
+                <tr><td>/test</td><td class="num">2</td></tr>
+                <tr><td>/commit</td><td class="num">1</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Sub-agents (3)</h2>
+        <div class="panel">
+          <table class="data-table">
+            <thead><tr><th>Type</th><th>Heading</th></tr></thead>
+            <tbody>
+              <tr><td>explore</td><td>Find JWT middleware usage across services</td></tr>
+              <tr><td>generalPurpose</td><td>Spike refresh token rotation design</td></tr>
+              <tr><td>explore</td><td>Map rate-limit config in gateway</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">Files</h2>
+        <div class="panel">
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">src/auth/middleware.ts</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">src/auth/jwt.ts</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag created">created</span>
+            <span class="file-path">src/auth/refresh.ts</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">tests/auth/login.test.ts</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">tests/auth/refresh.test.ts</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">openapi/paths/auth.yaml</span>
+          </div>
+          <div style="padding:6px 0;border-bottom:1px solid rgba(51,51,51,0.5)">
+            <span class="action-tag edited">edited</span>
+            <span class="file-path">docs/auth-runbook.md</span>
+          </div>
+          <div style="padding:6px 0">
+            <span class="action-tag deleted">deleted</span>
+            <span class="file-path">src/auth/legacy-session.ts</span>
+          </div>
         </div>
       </section>
     </main>
