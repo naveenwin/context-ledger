@@ -789,7 +789,8 @@
     <main class="main" id="main"></main>
   </div>
 
-  <script>
+  <script type="module">
+    import { toggleRepoExpanded } from "./server/repo-expand.js";
     const TOOL_PALETTE = [
       "#3794ff",
       "#4ec9b0",
@@ -1460,11 +1461,7 @@
       el.querySelectorAll(".repo-row").forEach((row) => {
         row.addEventListener("click", () => {
           const repoId = row.dataset.repoId;
-          if (state.expandedRepoIds.has(repoId)) {
-            state.expandedRepoIds.add(repoId);
-          } else {
-            state.expandedRepoIds.add(repoId);
-          }
+          toggleRepoExpanded(state.expandedRepoIds, repoId);
           state.selectedRepoId = repoId;
           state.selectedChatId = null;
           render();
