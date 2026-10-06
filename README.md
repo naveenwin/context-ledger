@@ -6,7 +6,7 @@ Context Ledger is a read-only dashboard for Cursor IDE agent sessions. It scans 
 
 ![Chat dashboard preview](docs/screenshots/dashboard-chat.png)
 
-**[View demo in browser](https://htmlpreview.github.io/?https://github.com/naveenwin/context-ledger/blob/main/demo/dashboard-preview.html)** — static UI with fictional data (no install). Source: [`demo/dashboard-preview.html`](demo/dashboard-preview.html) · [`demo/README.md`](demo/README.md).
+**[View demo in browser](https://htmlpreview.github.io/?https://github.com/naveenwin/context-ledger/blob/main/demo/dashboard-preview.html)** — static UI with fictional data (no install). Matches current layout including **Download PDF** (live export needs `npm start`). Source: [`demo/dashboard-preview.html`](demo/dashboard-preview.html) · [`demo/README.md`](demo/README.md).
 
 ## Why it exists
 
@@ -91,7 +91,7 @@ Open [http://localhost:3847](http://localhost:3847).
 
 Refresh cached scan: `curl http://localhost:3847/api/refresh` or reload after ~30s.
 
-Preview the UI without Cursor: [open the hosted demo](https://htmlpreview.github.io/?https://github.com/naveenwin/context-ledger/blob/main/demo/dashboard-preview.html), `npm run demo`, or [`demo/dashboard-preview.html`](demo/dashboard-preview.html).
+Preview the UI without Cursor: [open the hosted demo](https://htmlpreview.github.io/?https://github.com/naveenwin/context-ledger/blob/main/demo/dashboard-preview.html), `npm run demo`, or [`demo/dashboard-preview.html`](demo/dashboard-preview.html). The demo uses sample **Commands** (`~/.cursor/commands` + diff-tab) and a non-functional **Download PDF** button; real metrics need `npm start`.
 
 ## Optional: prompt hook (per-send composition)
 

@@ -80,11 +80,18 @@
       padding: 6px 10px 6px 8px;
       margin: 0 6px;
       border-radius: 4px;
+      cursor: pointer;
+      user-select: none;
     }
+    .repo-row:hover { background: var(--bg-hover); }
     .repo-row.selected { background: var(--bg-selected); }
     .chevron { width: 16px; height: 16px; color: var(--text-dim); transition: transform 0.15s; }
     .repo-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .chat-list { padding: 2px 0 4px; }
+    .chat-list {
+      display: none;
+      padding: 2px 0 4px;
+    }
+    .repo-block.expanded .chat-list { display: block; }
     .chat-row {
       padding: 5px 10px 5px 32px;
       margin: 0 6px;
@@ -108,7 +115,38 @@
       padding-bottom: 16px;
       border-bottom: 1px solid var(--border);
     }
-    .main-title { font-size: 20px; font-weight: 600; color: #e8e8e8; margin-bottom: 8px; }
+    .main-header-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .btn-download-report {
+      flex-shrink: 0;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      color: #e8e8e8;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-download-report:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .main-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #e8e8e8;
+      margin-bottom: 0;
+      flex: 1;
+      min-width: 0;
+    }
     .main-meta {
       display: flex;
       flex-wrap: wrap;
@@ -332,7 +370,7 @@
         </svg>
         <div>
           <div class="app-name">Context Ledger</div>
-          <div class="app-tagline">Cursor agent analytics</div>
+          <div class="app-tagline">Cursor chat analytics, locally</div>
         </div>
       </div>
       <div class="sidebar-header">Repositories</div>
@@ -391,11 +429,21 @@
     </aside>
     <main class="main">
       <div class="data-banner">
-        <strong>Live data</strong> — demo only. Context table &amp; % use <strong>Cursor composer state</strong> when linked; tools/skills from agent transcript.
+        <strong>Static preview</strong> — fictional data. Run <code>npm start</code> for real chats, ledger charts, and working <strong>Download PDF</strong>.
       </div>
 
       <header class="main-header">
-        <h1 class="main-title">Auth refactor</h1>
+        <div class="main-header-top">
+          <h1 class="main-title">Auth refactor</h1>
+          <button
+            type="button"
+            class="btn-download-report"
+            id="download-chat-report"
+            title="In the live app, exports this chat dashboard as PDF (main panel only)"
+          >
+            Download PDF
+          </button>
+        </div>
         <div class="main-meta">
           <span class="badge active">active</span>
           <span>Started Oct 2, 2026, 9:14 AM</span>
@@ -674,12 +722,12 @@
           </div>
           <div>
             <div class="card-label" style="margin-bottom:8px">Commands</div>
+            <div class="card-sub" style="margin-bottom:8px">Global <code>~/.cursor/commands</code> slash prompts (whitelist) and diff-tab UI actions—not project commands or path fragments.</div>
             <table class="data-table">
               <thead><tr><th>Command</th><th>Uses</th></tr></thead>
               <tbody>
-                <tr><td>/review</td><td class="num">2</td></tr>
-                <tr><td>/test</td><td class="num">2</td></tr>
-                <tr><td>/commit</td><td class="num">1</td></tr>
+                <tr><td>/code-review</td><td class="num">2</td></tr>
+                <tr><td>Commit &amp; push (diff tab)</td><td class="num">1</td></tr>
               </tbody>
             </table>
           </div>
@@ -739,5 +787,23 @@
       </section>
     </main>
   </div>
+  <script>
+    document.querySelectorAll(".repo-row").forEach((row) => {
+      row.addEventListener("click", () => {
+        const block = row.closest(".repo-block");
+        if (!block) return;
+        block.classList.toggle("expanded");
+        document.querySelectorAll(".repo-row").forEach((r) => r.classList.remove("selected"));
+        document.querySelectorAll(".chat-row").forEach((c) => c.classList.remove("selected"));
+        row.classList.add("selected");
+      });
+    });
+
+    document.getElementById("download-chat-report")?.addEventListener("click", () => {
+      alert(
+        "Download PDF is available in the live app.\n\nRun npm start in the Context Ledger repo and open http://localhost:3847 — then open a chat and use Download PDF."
+      );
+    });
+  </script>
 </body>
 </html>
