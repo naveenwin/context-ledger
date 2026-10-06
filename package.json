@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server/index.js",
     "scan": "node server/build-data.js",
-    "test": "node --test server/prompt-sample.test.js server/subagent-status.test.js server/repo-expand.test.js",
+    "test": "node --test server/prompt-sample.test.js server/subagent-status.test.js server/repo-expand.test.js server/cursor-commands.test.js",
     "demo": "open demo/dashboard-preview.html"
   }
 }

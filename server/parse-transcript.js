@@ -1,3 +1,4 @@
+import { detectChatCommands } from "./cursor-commands.js";
 import { readUtf8File, statReadOnly } from "./read-only.js";
 
 const CONTEXT_WINDOW_TOKENS = 200_000;
@@ -97,7 +98,10 @@ function isTranscriptRedactionOnly(text) {
   return t === "[REDACTED]" || /^(\[REDACTED\]\s*)+$/.test(t);
 }
 
-export function parseTranscript(jsonlPath, { chatId, workspacePath, titleFromDb } = {}) {
+export function parseTranscript(
+  jsonlPath,
+  { chatId, workspacePath, titleFromDb, globalSlashCommands = [] } = {}
+) {
   const stat = statReadOnly(jsonlPath);
   const raw = readUtf8File(jsonlPath);
   const lines = raw.split("\n").filter((l) => l.trim());
@@ -244,8 +248,8 @@ export function parseTranscript(jsonlPath, { chatId, workspacePath, titleFromDb 
         if (q) {
           if (!firstQuery) firstQuery = q;
           if (!title) title = q.split("\n")[0].slice(0, 80);
-          for (const m of q.matchAll(/\/([a-zA-Z][\w-]*)/g)) {
-            inc(commands, `/${m[1]}`);
+          for (const cmd of detectChatCommands(q, globalSlashCommands)) {
+            inc(commands, cmd);
           }
         }
         if (text.includes("<user_rules>")) rulesChars += text.length;

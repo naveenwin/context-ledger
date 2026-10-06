@@ -3,3 +3,4 @@ node_modules/
 .DS_Store
 .tmp-pdf-test.pdf
 .playwright-mcp/
+/.idea/

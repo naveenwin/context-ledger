@@ -7,6 +7,7 @@ import {
   decodeProjectSlug,
   repoIdFromKey,
 } from "./decode-slug.js";
+import { listGlobalSlashCommandSlugs } from "./cursor-commands.js";
 import { parseTranscript } from "./parse-transcript.js";
 import {
   applyComposerTelemetry,
@@ -83,6 +84,7 @@ function listTranscriptFiles(transcriptsDir) {
 export function buildRepositories() {
   const projectsDir = cursorProjectsDir();
   const workspaces = loadWorkspaceFolders();
+  const globalSlashCommands = listGlobalSlashCommandSlugs();
   const repoByKey = new Map();
 
   if (!pathExists(projectsDir)) {
@@ -116,6 +118,7 @@ export function buildRepositories() {
       let parsed = parseTranscript(jsonlPath, {
         chatId,
         workspacePath: ws.folderPath,
+        globalSlashCommands,
       });
       if (parsed.subAgents?.length) {
         const runs = loadSubagentRuns(chatId);
@@ -140,6 +143,7 @@ export function buildRepositories() {
       }
       const telemetry = loadComposerTelemetry(chatId, {
         workspacePath: ws.folderPath,
+        globalSlashCommands,
       });
       repo.chats.push(applyComposerTelemetry(parsed, telemetry));
     }
@@ -163,6 +167,7 @@ export function buildRepositories() {
       chatCount,
       estimatedContext: true,
       chatSource: "agent-transcripts",
+      globalSlashCommands,
     },
   };
 }

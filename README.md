@@ -20,7 +20,7 @@ Agent chats are opaque: context fills up, tools pile on, sub-agents spawn, and i
 - **Context window** — current % and token breakdown when composer id matches Cursor global storage; estimates from transcript otherwise
 - **Context composition** — horizontal bars per bucket (system, tools, rules, skills, MCP, conversation, summarized), whole-window mix strip, last prompt samples from the hook
 - **Context memory chart** — time series from `~/.context-ledger/history/` (15s watcher + prompt-hook points), axes, inferred summarization markers
-- **Tools, skills, agents, commands** — counts and mix from transcript tool calls
+- **Tools, skills, agents, commands** — tools/skills/agents from transcript; **Commands** counts `~/.cursor/commands` slash usage (whitelist) and diff-tab UI actions—not project `.cursor/commands` or path `/fragments`
 - **Models used** — transcript metadata plus per-send model from the optional prompt hook
 - **Repo-level aggregates** — rollups when no single chat is selected
 
@@ -30,6 +30,7 @@ Agent chats are opaque: context fills up, tools pile on, sub-agents spawn, and i
 |--------|----------------|----------------|-------|
 | Sidebar repos/chats | Names, status, recency | **Transcript** (`agent-transcripts/*.jsonl`) | v1 lists agent sessions only |
 | Tool calls, skills, files, turns | Usage counts & failures | **Transcript** | Parsed from JSONL tool/user/assistant events |
+| Commands | Global slash (`~/.cursor/commands`) + diff-tab UI | **Transcript** + **Composer** bubbles | `/slug` only when `slug` exists in global commands dir; expanded prompts may be under-counted |
 | Context now / composition bars | Token buckets in the prompt window | **Composer** (`globalStorage/state.vscdb`, read-only) | When transcript id matches a composer session |
 | Context % without composer link | Estimated series & compression count | **Transcript** | Labeled as estimated in the UI |
 | Context memory (ledger) chart | % or tokens over time | **Ledger** (`~/.context-ledger/history/<id>.jsonl`) | Written only by this app while `npm start` runs |

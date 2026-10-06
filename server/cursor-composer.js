@@ -3,6 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { openSqliteReadOnlyUri } from "./read-only.js";
 import { CURSOR_APP_SUPPORT } from "./paths.js";
+import {
+  detectChatCommands,
+  mergeCommandCountLists,
+} from "./cursor-commands.js";
 import { mapSubagentRunStatus } from "./subagent-status.js";
 
 const CATEGORY_TO_BUDGET_KEY = {
@@ -237,7 +241,50 @@ function readComposerSnapshot(composerId) {
     };
 }
 
-export function loadComposerTelemetry(composerId, { workspacePath } = {}) {
+function mapToCountList(map) {
+  return [...map.entries()]
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/** UI workflow + global slash commands from composer user bubbles (read-only). */
+export function loadComposerUiCommands(composerId, globalSlashCommands = []) {
+  if (!composerId) return [];
+  try {
+    const database = getGlobalDb();
+    const dataRow = database
+      .prepare("SELECT value FROM cursorDiskKV WHERE key = ?")
+      .get(`composerData:${composerId}`);
+    if (!dataRow?.value) return [];
+
+    const composer = parseJsonValue(dataRow.value);
+    const headers = composer?.fullConversationHeadersOnly || [];
+    const counts = new Map();
+
+    for (const header of headers) {
+      if (header.type !== 1 || !header.bubbleId) continue;
+      const bubbleRow = database
+        .prepare("SELECT value FROM cursorDiskKV WHERE key = ?")
+        .get(`bubbleId:${composerId}:${header.bubbleId}`);
+      if (!bubbleRow?.value) continue;
+      const bubble = parseJsonValue(bubbleRow.value);
+      const text = typeof bubble?.text === "string" ? bubble.text : "";
+      for (const cmd of detectChatCommands(text, globalSlashCommands)) {
+        counts.set(cmd, (counts.get(cmd) || 0) + 1);
+      }
+    }
+
+    return mapToCountList(counts);
+  } catch {
+    resetGlobalDb();
+    return [];
+  }
+}
+
+export function loadComposerTelemetry(
+  composerId,
+  { workspacePath, globalSlashCommands = [] } = {}
+) {
   try {
     const database = getGlobalDb();
     const headerRow = database
@@ -300,6 +347,11 @@ export function loadComposerTelemetry(composerId, { workspacePath } = {}) {
         ? composer.subagentComposerIds.length
         : null);
 
+    const composerCommands = loadComposerUiCommands(
+      composerId,
+      globalSlashCommands
+    );
+
     const fieldSources = {
       title: header?.name || composer.name ? "cursor-composer" : null,
       status: status ? "cursor-composer" : null,
@@ -317,7 +369,7 @@ export function loadComposerTelemetry(composerId, { workspacePath } = {}) {
       subAgents: numSubComposers != null ? "cursor-composer" : null,
       tools: "agent-transcript",
       skills: "agent-transcript",
-      commands: "agent-transcript",
+      commands: composerCommands.length ? "cursor-composer" : "agent-transcript",
       assistantChars: "agent-transcript",
     };
 
@@ -340,6 +392,7 @@ export function loadComposerTelemetry(composerId, { workspacePath } = {}) {
       composerAssistantBubbles: turnCounts.assistantBubbles,
       models: modelName ? [modelName] : [],
       agents: modeLabel ? [{ name: modeLabel, count: 1 }] : [],
+      commands: composerCommands,
       files: composerFiles,
       filesChangedCount,
       numSubComposers,
@@ -492,6 +545,7 @@ export function applyComposerTelemetry(chat, telemetry) {
     userTurns: telemetry.userTurns ?? chat.userTurns,
     models: mergeModelLists(chat.models, telemetry.models),
     agents,
+    commands: mergeCommandCountLists(chat.commands, telemetry.commands),
     files,
     contextBudget: telemetry.contextBudget || chat.contextBudget,
     contextSeries: mergeContextSeries(chat.contextSeries, telemetry),
